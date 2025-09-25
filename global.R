@@ -15,4 +15,9 @@ st_crs(points_sf)  <-  st_crs(taxons_input)
 
 areapal <- c("black",palette.colors(25,"Pastel 1",recycle=T))
 
+if (file.exists("groupings/spatial/groups.RDS")) {
+    previous_polygon <- readRDS(file = "groupings/spatial/groups.RDS")
+} else {
+    previous_polygon <- list()
+}
 conn <- BIADconnect::init.conn()

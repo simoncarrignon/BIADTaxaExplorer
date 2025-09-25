@@ -49,10 +49,10 @@ plot2dim <- function(ca.res,ngroup){
            else{
                for(dim in 1:2){
                    plot(1,1,type="n",main="",xlab="",ylab=paste("Dim",dim),xlim=c(1,length(unique(na.omit(cares$new_periods)))),ylim=range(cares[,paste("Dim",dim)]),xaxt="n")
-                   lapply(1:ngroup,function(area) lines(sort(cares$new_periods[cares$new_area == area]),cares[cares$new_area == area,paste("Dim",dim)][order(cares$new_periods[cares$new_area == area])],col=areacol[area],lwd=3,type="o"))
+                   lapply(1:ngroup,function(area) lines(seq_along(cares$new_periods[cares$new_area == area]),cares[cares$new_area == area,paste("Dim",dim)],col=areacol[area],lwd=3,type="o"))
                }
            }
-           axis(1, at=seq_along(levels(cares$new_periods)),label=levels(cares$new_periods))
+           axis(1, at=1+seq_along(unique(cares$new_periods)),label=rev(unique(cares$new_periods)))
 }
 
 plotPhase <- function(data){

@@ -8,14 +8,16 @@ shinyServer(function(input, output, session) {
   print(Sys.time())
   check.conn(conn)
   taxon_dataset <- reactiveVal()
-  drawnPolygons <- reactiveValues(polygons = list())
+
+  drawnPolygons <- reactiveValues(polygons = previous_polygon)
   groupInfo <- reactiveValues(ngroup = 1, group = rep(areapal[1], length(points_sf)))
   taxon_dataset(taxons_input)  # You should load the initial data here
     
   output$map <- renderLeaflet({
-    leaflet() %>%
-      addTiles() %>%
-      addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites") %>%
+    leaflet() |>
+      addTiles() |>
+      addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites") |>
+      addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) |>
       addDrawToolbar(
         targetGroup = 'drawn',
         polygonOptions = drawPolygonOptions(),
@@ -63,7 +65,7 @@ shinyServer(function(input, output, session) {
          showNotification("Please draw at least one area before proceeding.", type = "warning");
          return()
      }
-     #saveRDS(drawnPolygons$polygons, file = "groups.RDS");
+     saveRDS(drawnPolygons$polygons, file = "groupings/spatial/groups.RDS");
      #print(drawnPolygons$polygons)
      # Generate mockup plots
      groups <- do.call("rbind",drawnPolygons$polygons) #that should be a multipolygon with ach area manually selected
@@ -103,6 +105,7 @@ shinyServer(function(input, output, session) {
      })
      output$plot4 <- renderPlot({
          plot2dim(cts.ca,groupInfo$ngroup)
+         saveRDS(file="cts.ca.RDS",cts.ca)
      })
   })
   observeEvent(input$clear_polygons_btn, {

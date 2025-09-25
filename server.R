@@ -10,7 +10,7 @@ shinyServer(function(input, output, session) {
   taxon_dataset <- reactiveVal()
 
   drawnPolygons <- reactiveValues(polygons = previous_polygon)
-  groupInfo <- reactiveValues(ngroup = 1, group = rep(areapal[1], length(points_sf)))
+  groupInfo <- reactiveValues(ngroup = length(previous_polygon), group = rep(areapal[1], length(points_sf)))
   taxon_dataset(taxons_input)  # You should load the initial data here
     
   output$map <- renderLeaflet({
@@ -104,6 +104,7 @@ shinyServer(function(input, output, session) {
 
      })
      output$plot4 <- renderPlot({
+         print(groupInfo$ngroup)
          plot2dim(cts.ca,groupInfo$ngroup)
          saveRDS(file="cts.ca.RDS",cts.ca)
      })

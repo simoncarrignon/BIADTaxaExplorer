@@ -14,10 +14,13 @@ shinyServer(function(input, output, session) {
   taxon_dataset(taxons_input)  # You should load the initial data here
     
   output$map <- renderLeaflet({
-    leaflet() |>
+     
+    maps  <- leaflet() |>
       addTiles() |>
-      addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites") |>
-      addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) |>
+      addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites") 
+     if(!is.null(drawnPolygons$polygons) && length(drawnPolygons$polygons)>0)
+         maps  <- maps |>  addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) 
+     maps <- maps |>
       addDrawToolbar(
         targetGroup = 'drawn',
         polygonOptions = drawPolygonOptions(),
@@ -25,6 +28,7 @@ shinyServer(function(input, output, session) {
         polylineOptions = F, rectangleOptions = F, circleOptions = F,
              markerOptions = F, circleMarkerOptions = F
       )
+     maps
   })
   
   observeEvent(input$file_selector_tx, {

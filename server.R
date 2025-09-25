@@ -31,14 +31,12 @@ shinyServer(function(input, output, session) {
     taxon_dataset(taxon_new)  # Update the reactive value
   })
   observeEvent(input$file_selector_per, {
-     print(paste0("ooook:======",input$file_selector_per))
      taxon_new <- taxon_dataset()
      if(input$file_selector_per == "auto"){
          abs_periods=seq(input$start_value,input$end_value,-(input$duration))
          taxon_new$new_periods <- cut(taxon_new$GMM,breaks=abs_periods,label=abs_periods[-length(abs_periods)])
      }
      else if(input$file_selector_per == "groupings/periods/periods.csv"){
-         print(input$file_selector_per)
          taxon_new$new_periods <- groupPeriod(taxon_new$Period,input$file_selector_per)
          taxon_new$new_periods <- factor(taxon_new$new_periods,levels=c("Neolithic","Eneolithic","Bronze Age","Early Iron Age"),ordered=T)
      }
@@ -65,8 +63,8 @@ shinyServer(function(input, output, session) {
          showNotification("Please draw at least one area before proceeding.", type = "warning");
          return()
      }
-     saveRDS(drawnPolygons$polygons, file = "groups.RDS");
-     print(drawnPolygons$polygons)
+     #saveRDS(drawnPolygons$polygons, file = "groups.RDS");
+     #print(drawnPolygons$polygons)
      # Generate mockup plots
      groups <- do.call("rbind",drawnPolygons$polygons) #that should be a multipolygon with ach area manually selected
      cur_data=taxon_dataset()

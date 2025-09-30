@@ -1,5 +1,5 @@
 
-getFaunalTaxons <- function(crs=4326){
+getFaunalTaxa <- function(crs=4326){
     conn <- BIADconnect::init.conn()
     req <- 
         " SELECT 
@@ -8,6 +8,7 @@ getFaunalTaxons <- function(crs=4326){
             f.TaxonCode,
             p.PhaseId,
             p.Period,
+            p.Culture1,
             p.GMM,
             p.GMS,
             s.SiteId,

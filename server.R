@@ -103,7 +103,8 @@ shinyServer(function(input, output, session) {
              #               an=names(cts.ca$row$coord)
              #           else
              an=rownames(cts.ca$row$coord)
-             plot(cts.ca,col.row=areapal[as.numeric(gsub(".*-(\\d)","\\1",an))+1],col.col="dark green")
+             gp=as.numeric(gsub("(\\d+)-(\\d)","\\2",an))
+             plotCAarrows(cts.ca)
          }
 
      })

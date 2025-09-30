@@ -65,3 +65,45 @@ plotPhase <- function(data){
     points(-gms[,1],nrow(gms):1,cex=.2)
     abline(v=-abs_periods)
 }
+
+plotCAarrows <- function(cares){
+    # Function to calculate a shorter arrow length
+    shorten_arrows <- function(gp.coords, shorten_length = 0.03) {
+        max_index <- nrow(gp.coords)
+        xy0=gp.coords[max_index:2, 1:2]
+        xy1=gp.coords[(max_index-1):1, 1:2]
+        x0=xy0[,1]
+        y0=xy0[,2]
+        x1=xy1[,1]
+        y1=xy1[,2]
+
+        # Calculate direction vectors
+        dx <- x1 - x0
+        dy <- y1 - y0
+        distance <- sqrt(dx^2 + dy^2)
+
+        # Normalize and scale the direction
+        x1_new <- x1 - dx/distance * shorten_length
+        y1_new <- y1 - dy/distance * shorten_length
+        x0_new <- x0 + dx/distance * shorten_length
+        y0_new <- y0 + dy/distance * shorten_length
+
+        return(cbind(x0_new, y0_new,x1_new, y1_new))
+    }
+
+    # Prepare your arrows with the shortened lengths
+
+    plot(cares$row$coord[,1:2],col=areapal[gp+1],pch=20,type="n")
+    abline(v=0,lty=2,lwd=1.2)#(cts.ca$row$coord[,1:2],col=areapal[gp+1],pch=20)
+    abline(h=0,lty=2,lwd=1.2)#(cts.ca$row$coord[,1:2],col=areapal[gp+1],pch=20)
+    points(cares$row$coord[,1:2],col=areapal[gp+1],pch=20)
+    text(cares$row$coord[,1:2],rownames(cares$row$coord),col=areapal[gp+1],pos=3)
+
+    for(g in 1:2){
+        gp.coor=cts.ca$row$coord[gp==g,1:2]
+        gp.coor <- shorten_arrows(gp.coor,.03)
+        arrows( x0=gp.coor[,1],x1=gp.coor[,3],y0=gp.coor[,2],y1=gp.coor[,4],col=areapal[g+1],lw=1,length=.1)
+    }
+
+    text(cares$col$coord[,1:2],rownames(cts.ca$col$coord),col="dark green",font=3)
+}

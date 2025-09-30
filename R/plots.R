@@ -67,6 +67,8 @@ plotPhase <- function(data){
 }
 
 plotCAarrows <- function(cares){
+    an <- rownames(cares$row$coord)
+    gp <- as.numeric(gsub("(\\d+)-(\\d)","\\2",an))
     # Function to calculate a shorter arrow length
     shorten_arrows <- function(gp.coords, shorten_length = 0.03) {
         max_index <- nrow(gp.coords)
@@ -97,7 +99,7 @@ plotCAarrows <- function(cares){
     abline(v=0,lty=2,lwd=1.2)#(cts.ca$row$coord[,1:2],col=areapal[gp+1],pch=20)
     abline(h=0,lty=2,lwd=1.2)#(cts.ca$row$coord[,1:2],col=areapal[gp+1],pch=20)
     points(cares$row$coord[,1:2],col=areapal[gp+1],pch=20)
-    text(cares$row$coord[,1:2],rownames(cares$row$coord),col=areapal[gp+1],pos=3)
+    text(cares$row$coord[,1:2],an,col=areapal[gp+1],pos=3)
 
     for(g in 1:2){
         gp.coor=cts.ca$row$coord[gp==g,1:2]

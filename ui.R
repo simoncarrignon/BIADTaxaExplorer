@@ -7,6 +7,10 @@ library(geojsonsf)
 
 
 ui <- fluidPage(
+  tags$div(
+    style = "background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-bottom: 20px;",
+    tags$h2("Warning: This is an experimental website for internal and testing use only.")
+  ),
   leafletOutput("map", height='60vh'),
   verbatimTextOutput("groups"),
   actionButton("run_btn", "Run Analysis"),

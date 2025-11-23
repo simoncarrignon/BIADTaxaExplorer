@@ -116,6 +116,13 @@ shinyServer(function(input, output, session) {
          plot2dim(cts.ca,groupInfo$ngroup)
          saveRDS(file="cts.ca.RDS",cts.ca)
      })
+     grp=as.numeric(st_intersects(points_sf,do.call("rbind",drawnPolygons$polygons)))
+     grp=ifelse(is.na(grp),"black",areapal[grp+1])
+     groupInfo$group <- grp
+     leafletProxy("map") |>
+       clearGroup("sites") |>
+       addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) |>
+       addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites")
   })
   observeEvent(input$clear_polygons_btn, {
     drawnPolygons$polygons <- list()  # Clear the stored polygons

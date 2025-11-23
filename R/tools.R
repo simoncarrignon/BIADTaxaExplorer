@@ -1,6 +1,6 @@
 split_plus <- function(listtax) trimws(strsplit(listtax,"\\+")[[1]])
 
-groupTaxons <- function(dataset,filename="groupings/periods/group_IV.csv"){
+groupTaxons <- function(dataset,filename="groupings/faunal_taxa/group_IV.csv"){
     gdata <- read.csv(filename,skip=1,header=F)
     gdata  <- gdata[!is.na(gdata[,1]),]
     txl <- trimws(gsub("=","",gdata[,2]))

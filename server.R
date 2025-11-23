@@ -35,12 +35,17 @@ shinyServer(function(input, output, session) {
     selected_file <- input$file_selector_tx
     taxon_new <- groupTaxons(taxon_dataset(),selected_file)
     taxon_dataset(taxon_new)  # Update the reactive value
+    output$taxon_table <- renderText({
+         ns=lengths(tapply(taxon_new$TaxonCode,taxon_new$new_txgroups,unique))
+         paste("\t\t<i> groups are: ", paste0(paste(names(ns),":",ns,"tx"),collapse=", "),"</i>  ")
+        })
+
   })
   observeEvent(input$file_selector_per, {
      taxon_new <- taxon_dataset()
      if(input$file_selector_per == "auto"){
          abs_periods=seq(input$start_value,input$end_value,-(input$duration))
-         taxon_new$new_periods <- cut(taxon_new$GMM,breaks=abs_periods,label=abs_periods[-length(abs_periods)])
+         taxon_new$new_periods <- cut(taxon_new$GMM,breaks=abs_periods,label=rev(abs_periods[-length(abs_periods)]))
      }
      else if(input$file_selector_per == "groupings/periods/periods.csv"){
          taxon_new$new_periods <- groupPeriod(taxon_new$Period,input$file_selector_per)

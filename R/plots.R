@@ -102,10 +102,10 @@ plotCAarrows <- function(cares){
     text(cares$row$coord[,1:2],an,col=areapal[gp+1],pos=3)
 
     for(g in 1:2){
-        gp.coor=cts.ca$row$coord[gp==g,1:2]
+        gp.coor=cares$row$coord[gp==g,1:2]
         gp.coor <- shorten_arrows(gp.coor,.03)
         arrows( x0=gp.coor[,1],x1=gp.coor[,3],y0=gp.coor[,2],y1=gp.coor[,4],col=areapal[g+1],lw=1,length=.1)
     }
 
-    text(cares$col$coord[,1:2],rownames(cts.ca$col$coord),col="dark green",font=3)
+    text(cares$col$coord[,1:2],rownames(cares$col$coord),col="dark green",font=3)
 }

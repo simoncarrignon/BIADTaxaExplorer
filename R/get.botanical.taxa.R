@@ -1,6 +1,6 @@
 
-getABotTaxa <- function(crs=4326){
-    conn <- BIADconnect::init.conn()
+getABotTaxa <- function(crs=4326,conn=NULL){
+    if(is.null(conn))conn <- BIADconnect::init.conn()
     req <- 
         " SELECT 
             a.SampleID,

@@ -1,6 +1,6 @@
 
-getFaunalTaxa <- function(crs=4326){
-    conn <- BIADconnect::init.conn()
+getFaunalTaxa <- function(crs=4326,conn=NULL){
+    if(is.null(conn))conn <- BIADconnect::init.conn()
     req <- 
         " SELECT 
             f.FaunalSpeciesID,

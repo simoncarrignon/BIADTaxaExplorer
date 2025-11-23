@@ -6,17 +6,17 @@ bySpeciesComposition <- function(dataset){
         region=dataset[dataset$new_area == i,]
         region.freq <- t(tapply(region$NISP,list(region$new_periods,region$new_txgroups),function(i)sum(i,na.rm=T)))
        region.freq <- apply(region.freq,2,function(i)i/sum(i,na.rm=T))
-        barplot(region.freq,legend=(i==ngroups),args.legend=list(bg="white",cex=.75),space=0,main=paste("Area",i),col=cols,lwd=.1,border=.6)
+        barplot(region.freq[,ncol(region.freq):1],legend=(i==ngroups),args.legend=list(bg="white",cex=.75),space=0,main=paste("Area",i),col=cols,lwd=.1,border=.6)
     }
 }
 
-countTotal <- function(dataset){
+countTotal<- function(dataset){
     ngroups=length(unique(na.omit(dataset$new_area)))
     areacol <- palette.colors(length(unique(dataset$new_area)),"Pastel 1",recycle=T)
     counts <- tapply(dataset$NISP, list(dataset$new_periods,dataset$new_area ),sum,na.rm=T)
     plot(counts[,1],type="n",cex=3,lwd=3,ylim=range(counts,na.rm=T),col=areacol[1],ylab="NISP",xaxt="n",xlab="")
-    for(i in 1:ncol(counts))lines(counts[,i],type="o",cex=3,lwd=3,ylim=range(counts),col=areacol[i])
-    axis(1,    at=seq_along(levels(dataset$new_periods)),label=levels(dataset$new_periods))
+    for(i in 1:ncol(counts))lines(rev(counts[,i]),type="o",cex=3,lwd=3,ylim=range(counts),col=areacol[i])
+    axis(1,    at=seq_along(levels(dataset$new_periods)),label=rev(levels(dataset$new_periods)))
     legend("topright",lwd=3,pch=1,col=areacol,legend=paste0("area",1:ngroups))
 }
 
@@ -49,7 +49,7 @@ plot2dim <- function(ca.res,ngroup){
            else{
                for(dim in 1:2){
                    plot(1,1,type="n",main="",xlab="",ylab=paste("Dim",dim),xlim=c(1,length(unique(na.omit(cares$new_periods)))),ylim=range(cares[,paste("Dim",dim)]),xaxt="n")
-                   lapply(1:ngroup,function(area) lines(seq_along(cares$new_periods[cares$new_area == area]),cares[cares$new_area == area,paste("Dim",dim)],col=areacol[area],lwd=3,type="o"))
+                   lapply(1:ngroup,function(area) lines(seq_along(cares$new_periods[cares$new_area == area]),rev(cares[cares$new_area == area,paste("Dim",dim)]),col=areacol[area],lwd=3,type="o"))
                }
            }
            axis(1, at=1+seq_along(unique(cares$new_periods)),label=rev(unique(cares$new_periods)))

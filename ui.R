@@ -29,7 +29,7 @@ ui <- fluidPage(
     ),
   ),
 
-  selectInput("file_selector_per", "How to group periods", choices = list(Auto="auto","Period Name"="groupings/periods/periods.csv"),selected="auto",width="150px"),
+  selectInput("file_selector_per", "How to group periods", choices = list("Auto"="auto","Period Name"="groupings/periods/periods.csv"),selected="auto",width="150px"),
   conditionalPanel(
     condition = "input.file_selector_per == 'auto'",
     fluidRow(
@@ -38,16 +38,16 @@ ui <- fluidPage(
       column(width = 2, sliderInput("duration", "Time slice duration:", min = 100, max = 1000, value = 500, step = 50, width = "100%"))
     )
   ),
-HTML("<p><b>Figure 1:</b> <br/> Raw data. Left Total number of NISP for each phase in each selected region, right, percentage of each group in each phase for each area </p>"),
+HTML("<p><b>Figure 1:</b> <br/> Raw data. Left: total number of NISP for each phase in each selected region. Right: percentage of each group in each phase for each area </p>"),
 fluidRow(
   column(4, plotOutput("plot1", height = "300px")),
   column(4, plotOutput("plot2", height = "300px"))
   ),
-HTML("<p><b>Figure 2:</b> <br/> Result of the Correspondance Analysis, with arrow representing the order of the phases</p>"),
+HTML("<p><b>Figure 2:</b> <br/> Result of the Correspondence Analysis, with arrow representing the order of the phases</p>"),
 fluidRow(
   column(width=6, plotOutput("plot3", height = "500px",width="100%"))
 ),
-HTML("<p><b>Figure 3:</b> <br/> Split of the two dimension of the CA.</p>"),
+HTML("<p><b>Figure 3:</b> <br/> Split of the two dimensions of the CA.</p>"),
 fluidRow(
   column(width=6, plotOutput("plot4", height = "500px",width="100%"))
   )

@@ -15,7 +15,8 @@ ui <- fluidPage(
   verbatimTextOutput("groups"),
   actionButton("run_btn", "Run Analysis"),
   actionButton("clear_polygons_btn", "Clear Polygons"),
-  # Create a fluidRow for the select input and tableOutput
+  downloadButton("download_polygons", "Download Polygons"),
+  downloadButton("download_table", "Download Data"),
   fluidRow(
     column(width = 6,
            selectInput("file_selector_tx", "Select File to group taxon:", 

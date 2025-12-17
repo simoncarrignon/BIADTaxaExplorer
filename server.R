@@ -8,6 +8,7 @@ shinyServer(function(input, output, session) {
   print(Sys.time())
   check.conn(conn)
   taxon_dataset <- reactiveVal()
+  combinedData <- reactiveVal()  # Define a reactiveVal to store the combined data
 
   drawnPolygons <- reactiveValues(polygons = previous_polygon)
   groupInfo <- reactiveValues(ngroup = length(previous_polygon), group = rep(areapal[1], length(points_sf)))
@@ -30,6 +31,32 @@ shinyServer(function(input, output, session) {
       )
      maps
   })
+
+  output$download_polygons <- downloadHandler(
+    filename = "exported_polygons.gpkg", 
+    content = function(file) {
+      if (!is.null(drawnPolygons$polygons) && length(drawnPolygons$polygons) > 0) {
+        all_polygons <- do.call(rbind, drawnPolygons$polygons)
+        st_write(all_polygons, file, driver = "gpkg")
+      } else {
+        showNotification("No polygons to download!", type = "warning")
+      }
+    }
+  )
+
+  output$download_table <- downloadHandler(
+    filename = "aggregated_data.csv", 
+    content = function(file) {
+      data <- combinedData()
+      if (!is.null(data)) {
+        write.csv(data, file, row.names=F)
+      } else {
+        showNotification("No data available for download.", type = "warning",duration=5)
+        stop("No data available for download.")
+      }
+    }
+  )
+
   
   observeEvent(input$file_selector_tx, {
     selected_file <- input$file_selector_tx
@@ -85,7 +112,6 @@ shinyServer(function(input, output, session) {
      subregions$phase <- paste(subregions$new_periods,subregions$new_area,sep="-")
      totnisp <- aggregate(NISP ~ new_periods + new_area , data=subregions,sum,na.rm=TRUE)
      print("running CA")
-
      cts <<- tapply(subregions$NISP,list(subregions$phase,subregions$new_txgroups),sum,na.rm=T)
 
      if(any(is.na(cts)))
@@ -94,7 +120,11 @@ shinyServer(function(input, output, session) {
          cts[is.na(cts)] <- 0
      }
      cts.ca <<- FactoMineR::CA(cts,graph=F)
-
+     an <- rownames(cts)
+     perarea <- do.call("rbind",strsplit(an,"-"))
+     colnames(perarea) <- c("Phase start","Polygon ID")
+     combined_data  <- cbind.data.frame(perarea,cts,cts.ca$row$coord)
+     combinedData(combined_data)
      output$plot1 <- renderPlot({
          countTotal(subregions)
      })
@@ -124,6 +154,8 @@ shinyServer(function(input, output, session) {
        addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) |>
        addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites")
   })
+
+
   observeEvent(input$clear_polygons_btn, {
     drawnPolygons$polygons <- list()  # Clear the stored polygons
     groupInfo$ngroup <- 1

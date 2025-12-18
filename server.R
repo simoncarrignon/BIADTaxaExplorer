@@ -12,24 +12,48 @@ shinyServer(function(input, output, session) {
 
   drawnPolygons <- reactiveValues(polygons = previous_polygon)
   groupInfo <- reactiveValues(ngroup = length(previous_polygon), group = rep(areapal[1], length(points_sf)))
-  taxon_dataset(taxons_input)  # You should load the initial data here
+  taxon_dataset(allBTaxa)  # You should load the initial data here
+
+  observeEvent(input$data_type_selector, {
+    sel <- input$data_type_selector
+    print(sel)
+    type <- ifelse(sel == "Faunal", "faunal_taxa/", "botanical_taxa/")
+    path <- file.path("groupings",type)
+    print(path)
+    updateSelectInput(
+      session, "file_selector_tx",
+      choices = list.files(path , pattern = "group_.*.csv", full.names = TRUE),
+    )
+    if( sel == "Faunal")
+        dataset <- allFTaxa
+    else
+        dataset <- allBTaxa
+    head(dataset)
+    taxon_dataset(dataset)
+     output$plot1 <- renderPlot({})
+     output$plot2 <- renderPlot({})
+     output$plot3 <- renderPlot({})
+     output$plot4 <- renderPlot({})
+  })
     
   output$map <- renderLeaflet({
-     
     maps  <- leaflet() |>
       addTiles() |>
       addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites") 
-     if(!is.null(drawnPolygons$polygons) && length(drawnPolygons$polygons)>0)
-         maps  <- maps |>  addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) 
-     maps <- maps |>
+     
+    if(!is.null(drawnPolygons$polygons) && length(drawnPolygons$polygons)>0){
+      maps  <- maps |>  
+        addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) 
+    }
+    maps <- maps |>
       addDrawToolbar(
         targetGroup = 'drawn',
         polygonOptions = drawPolygonOptions(),
         editOptions = F,
         polylineOptions = F, rectangleOptions = F, circleOptions = F,
-             markerOptions = F, circleMarkerOptions = F
+          markerOptions = F, circleMarkerOptions = F
       )
-     maps
+    maps
   })
 
   output$download_polygons <- downloadHandler(
@@ -60,7 +84,11 @@ shinyServer(function(input, output, session) {
   
   observeEvent(input$file_selector_tx, {
     selected_file <- input$file_selector_tx
-    taxon_new <- groupTaxons(taxon_dataset(),selected_file)
+    print(selected_file)
+    taxon_new <-taxon_dataset()
+    print(summary(taxon_new))
+
+    taxon_new <- groupTaxons(taxon_new,selected_file)
     taxon_dataset(taxon_new)  # Update the reactive value
     output$taxon_table <- renderText({
          ns=lengths(tapply(taxon_new$TaxonCode,taxon_new$new_txgroups,unique))
@@ -110,9 +138,12 @@ shinyServer(function(input, output, session) {
      cur_data$new_area  <- as.numeric(st_intersects(cur_data,groups))
      subregions <- cur_data[!is.na(cur_data$new_area) & !is.na(cur_data$new_periods),]
      subregions$phase <- paste(subregions$new_periods,subregions$new_area,sep="-")
-     totnisp <- aggregate(NISP ~ new_periods + new_area , data=subregions,sum,na.rm=TRUE)
+     sel <- input$data_type_selector
+     if(sel == "Faunal") cnt <- "NISP"
+     if(sel == "Botanical") cnt <- "TotalCount"
+
      print("running CA")
-     cts <<- tapply(subregions$NISP,list(subregions$phase,subregions$new_txgroups),sum,na.rm=T)
+     cts <- tapply(subregions[[cnt]],list(subregions$phase,subregions$new_txgroups),sum,na.rm=T)
 
      if(any(is.na(cts)))
      { 
@@ -126,17 +157,15 @@ shinyServer(function(input, output, session) {
      combined_data  <- cbind.data.frame(perarea,cts,cts.ca$row$coord)
      combinedData(combined_data)
      output$plot1 <- renderPlot({
-         countTotal(subregions)
+         countTotal(subregions,cnt)
      })
 
      output$plot2 <- renderPlot({
-         bySpeciesComposition(subregions)
+         bySpeciesComposition(subregions,cnt)
      })
      output$plot3 <- renderPlot({
 
          if(!(is.null(dim(cts.ca$row$coord)))){
-             #               an=names(cts.ca$row$coord)
-             #           else
              plotCAarrows(cts.ca)
          }
 

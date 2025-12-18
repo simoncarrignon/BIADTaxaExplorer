@@ -143,8 +143,11 @@ shinyServer(function(input, output, session) {
      { 
          showNotification("Some taxon are missing from some periods/area, we will assume they are asbent (ie replace NA by 0) of the group", type = "warning")
          cts[is.na(cts)] <- 0
+         nullrow <- apply(cts,1,sum) == 0
+         cts <- cts[!nullrow,] 
      }
-     cts.ca <<- FactoMineR::CA(cts,graph=F)
+     print(cts[1:10,])
+     cts.ca <- FactoMineR::CA(cts,graph=F)
      an <- rownames(cts)
      perarea <- do.call("rbind",strsplit(an,"-"))
      colnames(perarea) <- c("Phase start","Polygon ID")
@@ -167,7 +170,6 @@ shinyServer(function(input, output, session) {
      output$plot4 <- renderPlot({
          print(groupInfo$ngroup)
          plot2dim(cts.ca,groupInfo$ngroup)
-         saveRDS(file="cts.ca.RDS",cts.ca)
      })
      grp=as.numeric(st_intersects(points_sf,do.call("rbind",drawnPolygons$polygons)))
      grp=ifelse(is.na(grp),"black",areapal[grp+1])

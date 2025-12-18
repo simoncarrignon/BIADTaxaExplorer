@@ -5,6 +5,7 @@ getABotTaxa <- function(crs=4326,conn=NULL){
         " SELECT 
             a.SampleID,
             a.TaxonCode,
+            a.TotalCount,
             p.PhaseId,
             p.Period,
             p.Culture1,

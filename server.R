@@ -16,10 +16,8 @@ shinyServer(function(input, output, session) {
 
   observeEvent(input$data_type_selector, {
     sel <- input$data_type_selector
-    print(sel)
     type <- ifelse(sel == "Faunal", "faunal_taxa/", "botanical_taxa/")
     path <- file.path("groupings",type)
-    print(path)
     updateSelectInput(
       session, "file_selector_tx",
       choices = list.files(path , pattern = "group_.*.csv", full.names = TRUE),
@@ -84,9 +82,7 @@ shinyServer(function(input, output, session) {
   
   observeEvent(input$file_selector_tx, {
     selected_file <- input$file_selector_tx
-    print(selected_file)
     taxon_new <-taxon_dataset()
-    print(summary(taxon_new))
 
     taxon_new <- groupTaxons(taxon_new,selected_file)
     taxon_dataset(taxon_new)  # Update the reactive value
@@ -130,8 +126,6 @@ shinyServer(function(input, output, session) {
          return()
      }
      saveRDS(drawnPolygons$polygons, file = "groupings/spatial/groups.RDS");
-     #print(drawnPolygons$polygons)
-     # Generate mockup plots
      groups <- do.call("rbind",drawnPolygons$polygons) #that should be a multipolygon with ach area manually selected
      cur_data=taxon_dataset()
      st_crs(cur_data)=st_crs(groups)

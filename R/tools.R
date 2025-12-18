@@ -1,15 +1,15 @@
 split_plus <- function(listtax) trimws(strsplit(listtax,"\\+")[[1]])
 
-groupTaxons <- function(dataset,filename="groupings/faunal_taxa/group_IV.csv"){
+groupTaxons <- function(dataset,filename="groupings/faunal_taxa/group_IV.csv",logging=TRUE){
     gdata <- read.csv(filename,skip=1,header=F)
-    gdata  <- gdata[!is.na(gdata[,1]),]
-    txl <- trimws(gsub("=","",gdata[,2]))
-    lot  <-  sapply(gdata[,3],split_plus)
+    gdata  <- gdata[!is.na(gdata[,1]),] 
+    txl <- trimws(gsub("=","",gdata[,2])) #taxon label
+    lot  <-  sapply(gdata[,3],split_plus) #list of taxon
     names(lot)=txl
     grouping=lot
     correspTx = unlist(lapply(names(grouping),function(e){names(grouping[[e]])=grouping[[e]];grouping[[e]][]=e;grouping[[e]]}))
     dataset$new_txgroups = correspTx[dataset$TaxonCode]
-    print(paste0("grouping ",length(unique(dataset$TaxonCode))," Taxons in  ",length(grouping)," larger categories"))
+    if(logging)print(paste0("grouping ",length(unique(dataset$TaxonCode))," Taxons in  ",length(grouping)," larger categories, ",length(unique(dataset$TaxonCode[is.na(dataset$new_txgroups)]))," not matched.") )
     return(dataset)
 }
 

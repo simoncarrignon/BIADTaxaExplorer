@@ -1,20 +1,20 @@
-bySpeciesComposition <- function(dataset){
+bySpeciesComposition <- function(dataset,cnt){
     cols=palette.colors(length(unique(dataset$new_txgroups)),"Pastel 2")
     ngroups=length(unique(na.omit(dataset$new_area)))
     par(mfrow=c(1,ngroups),oma=c(3,1,0,0),mar=c(1,1,1,1))
     for(i in 1:ngroups){
         region=dataset[dataset$new_area == i,]
-        region.freq <- t(tapply(region$NISP,list(region$new_periods,region$new_txgroups),function(i)sum(i,na.rm=T)))
+        region.freq <- t(tapply(region[[cnt]],list(region$new_periods,region$new_txgroups),function(i)sum(i,na.rm=T)))
        region.freq <- apply(region.freq,2,function(i)i/sum(i,na.rm=T))
         barplot(region.freq[,ncol(region.freq):1],legend=(i==ngroups),args.legend=list(bg="white",cex=.75),space=0,main=paste("Area",i),col=cols,lwd=.1,border=.6)
     }
 }
 
-countTotal<- function(dataset){
+countTotal<- function(dataset,cnt){
     ngroups=length(unique(na.omit(dataset$new_area)))
     areacol <- palette.colors(length(unique(dataset$new_area)),"Pastel 1",recycle=T)
-    counts <- tapply(dataset$NISP, list(dataset$new_periods,dataset$new_area ),sum,na.rm=T)
-    plot(counts[,1],type="n",cex=3,lwd=3,ylim=range(counts,na.rm=T),col=areacol[1],ylab="NISP",xaxt="n",xlab="")
+    counts <- tapply(dataset[[cnt]], list(dataset$new_periods,dataset$new_area ),sum,na.rm=T)
+    plot(counts[,1],type="n",cex=3,lwd=3,ylim=range(counts,na.rm=T),col=areacol[1],ylab=cnt,xaxt="n",xlab="")
     for(i in 1:ncol(counts))lines(rev(counts[,i]),type="o",cex=3,lwd=3,ylim=range(counts),col=areacol[i])
     axis(1,    at=seq_along(levels(dataset$new_periods)),label=rev(levels(dataset$new_periods)))
     legend("topright",lwd=3,pch=1,col=areacol,legend=paste0("area",1:ngroups))

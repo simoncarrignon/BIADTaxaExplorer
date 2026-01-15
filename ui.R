@@ -15,8 +15,8 @@ ui <- fluidPage(
   actionButton("run_btn", "Run Analysis"),
   actionButton("clear_polygons_btn", "Clear Polygons"),
   downloadButton("download_polygons", "Download Polygons"),
-  fileInput("shapefile", "Upload Polygons (.gpkg)", accept = ".gpkg"),
   downloadButton("download_table", "Download Data"),
+  fileInput("shapefile", "Upload Polygons (.gpkg)", accept = ".gpkg"),
   fluidRow(
     column(width = 6,
            selectInput("file_selector_tx", "Select File to group taxon:", 

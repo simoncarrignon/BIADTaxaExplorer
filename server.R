@@ -8,10 +8,10 @@ shinyServer(function(input, output, session) {
   print(Sys.time())
   check.conn(conn)
   taxon_dataset <- reactiveVal()
+  polygons <- reactiveVal()
   combinedData <- reactiveVal()  # Define a reactiveVal to store the combined data
 
-  drawnPolygons <- reactiveValues(polygons = previous_polygon)
-  groupInfo <- reactiveValues(ngroup = length(previous_polygon), group = rep(areapal[1], length(points_sf)))
+  groupInfo <- reactiveValues(ngroup = length(polygons), group = rep(areapal[1], length(points_sf)))
   taxon_dataset(allBTaxa)  # You should load the initial data here
 
   observeEvent(input$data_type_selector, {
@@ -28,38 +28,40 @@ shinyServer(function(input, output, session) {
         dataset <- allBTaxa
     head(dataset)
     taxon_dataset(dataset)
-     output$plot1 <- renderPlot({})
-     output$plot2 <- renderPlot({})
-     output$plot3 <- renderPlot({})
-     output$plot4 <- renderPlot({})
+    output$plot1 <- renderPlot({})
+    output$plot2 <- renderPlot({})
+    output$plot3 <- renderPlot({})
+    output$plot4 <- renderPlot({})
   })
     
   output$map <- renderLeaflet({
-    maps  <- leaflet() |>
-      addTiles() |>
-      addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites") 
-     
-    if(!is.null(drawnPolygons$polygons) && length(drawnPolygons$polygons)>0){
-      maps  <- maps |>  
-        addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) 
-    }
-    maps <- maps |>
-      addDrawToolbar(
-        targetGroup = 'drawn',
-        polygonOptions = drawPolygonOptions(),
-        editOptions = F,
-        polylineOptions = F, rectangleOptions = F, circleOptions = F,
-          markerOptions = F, circleMarkerOptions = F
-      )
-    maps
+
+      polygons <- polygons()
+      maps  <- leaflet() |>
+        addTiles() |>
+        addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites") 
+      if(!is.null(polygons) && length(polygons)>0){
+          maps  <- maps |>  
+          addPolygons(data = polygons, fillColor = "transparent", stroke = TRUE) 
+      }
+      maps <- maps |>
+        addDrawToolbar(
+           targetGroup = 'polygons',
+           polygonOptions = drawPolygonOptions(),
+           editOptions = F,
+           polylineOptions = F, rectangleOptions = F, circleOptions = F,
+           markerOptions = F, circleMarkerOptions = F
+        )
+      maps
   })
 
   output$download_polygons <- downloadHandler(
     filename = "exported_polygons.gpkg", 
     content = function(file) {
-      if (!is.null(drawnPolygons$polygons) && length(drawnPolygons$polygons) > 0) {
-        all_polygons <- do.call(rbind, drawnPolygons$polygons)
-        st_write(all_polygons, file, driver = "gpkg")
+
+      polygons <- polygons()
+      if (!is.null(polygons) && length(polygons) > 0) {
+        st_write(polygons, file, driver = "gpkg")
       } else {
         showNotification("No polygons to download!", type = "warning")
       }
@@ -79,19 +81,6 @@ shinyServer(function(input, output, session) {
     }
   )
 
-  
-  #observeEvent(input$file_selector_tx, {
-  #  selected_file <- input$file_selector_tx
-  #  taxon_new <-taxon_dataset()
-
-  #  taxon_new <- groupTaxons(taxon_new,selected_file)
-  #  taxon_dataset(taxon_new)  # Update the reactive value
-  #  output$taxon_table <- renderText({
-  #       ns=lengths(tapply(taxon_new$TaxonCode,taxon_new$new_txgroups,unique))
-  #       paste("\t\t<i> groups are: ", paste0(paste(names(ns),":",ns,"tx"),collapse=", "),"</i>  ")
-  #      })
-
-  #})
   observeEvent(input$upload_own_grouping, {
     # Trigger file input
     shinyjs::reset("file_upload") # Reset file input
@@ -106,7 +95,6 @@ shinyServer(function(input, output, session) {
      if(input$file_selector_per == "auto"){
          abs_periods=seq(input$start_value,input$end_value,-(input$duration))
          taxon_new$new_periods <- cut(taxon_new$GMM,breaks=abs_periods,label=rev(abs_periods[-length(abs_periods)]))
-         print(taxon_new$new_periods)
      }
      else if(input$file_selector_per == "groupings/periods/periods.csv"){
          taxon_new$new_periods <- groupPeriod(taxon_new$Period,input$file_selector_per)
@@ -116,44 +104,57 @@ shinyServer(function(input, output, session) {
   })
 
   observeEvent({
-    input$start_value
-    input$end_value
-    input$duration
+      input$start_value
+      input$end_value
+      input$duration
   }, {
-    taxon_new <- taxon_dataset()
-  print("update")
-  print(paste(input$end_value,input$duration,input$start_value))
-    abs_periods <- seq(input$start_value, input$end_value, -(input$duration))
-    taxon_new$new_periods <- cut(taxon_new$GMM, breaks = abs_periods, labels = rev(abs_periods[-length(abs_periods)]))
-    taxon_dataset(taxon_new)
+      taxon_new <- taxon_dataset()
+      print("update")
+      print(paste(input$end_value,input$duration,input$start_value))
+      abs_periods <- seq(input$start_value, input$end_value, -(input$duration))
+      taxon_new$new_periods <- cut(taxon_new$GMM, breaks = abs_periods, labels = rev(abs_periods[-length(abs_periods)]))
+      taxon_dataset(taxon_new)
+      output$plot1 <- renderPlot({})
+      output$plot2 <- renderPlot({})
+      output$plot3 <- renderPlot({})
+      output$plot4 <- renderPlot({})
   })
 
   observeEvent(input$map_draw_new_feature, {
     feature <- input$map_draw_new_feature
     pol <- geojson_sf(jsonlite::toJSON(feature,auto_unbox=T))
-    drawnPolygons$polygons <- append(drawnPolygons$polygons, list(pol))
-    groupInfo$ngroup <- groupInfo$ngroup+1
+    print(pol)
+    prev_pol <- polygons()
+    polygons <- rbind(prev_pol, pol)
+    polygons(polygons)
+    groupInfo$ngroup <- groupInfo$ngroup + 1
     groupInfo$group <- ifelse(lengths(st_intersects(points_sf,pol)),areapal[groupInfo$ngroup],groupInfo$group)
+
+    print("---- grouped poly:")
+    print(polygons)
+    print("----")
 
     leafletProxy("map") |>
       clearGroup("sites") |>
-      addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) |>
+      addPolygons(data = polygons, fillColor = "transparent", stroke = TRUE) |>
       addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites")
   })
   
   
   observeEvent(input$run_btn, { 
-                   drawnPolygons <- drawnPolygons()
-     if(is.null(drawnPolygons$polygons) || length(drawnPolygons$polygons)==0)
+     polygons <- polygons()
+     if(is.null(polygons) || length(polygons)==0)
      {
-         showNotification("Please draw at least one area before proceeding.", type = "warning");
+         showNotification("Please draw or upload at least one area before proceeding.", type = "warning");
          return()
      }
      #saveRDS(drawnPolygons$polygons, file = "groupings/spatial/groups.RDS");
-     groups <- do.call("rbind",drawnPolygons$polygons) #that should be a multipolygon with ach area manually selected
-     cur_data=taxon_dataset()
-     st_crs(cur_data)=st_crs(groups)
-     cur_data$new_area  <- as.numeric(st_intersects(cur_data,groups))
+     groups <- length(polygons) #that should be a multipolygon with ach area manually selected
+     print("---start analysis")
+     print(polygons)
+     cur_data <- taxon_dataset()
+     st_crs(cur_data) <- st_crs(polygons)
+     cur_data$new_area  <- as.numeric(st_intersects(cur_data,polygons))
      subregions <- cur_data[!is.na(cur_data$new_area) & !is.na(cur_data$new_periods),]
      subregions$phase <- paste(subregions$new_periods,subregions$new_area,sep="-")
      sel <- input$data_type_selector
@@ -170,7 +171,6 @@ shinyServer(function(input, output, session) {
          nullrow <- apply(cts,1,sum) == 0
          cts <- cts[!nullrow,] 
      }
-     print(cts[1:10,])
      cts.ca <- FactoMineR::CA(cts,graph=F)
      an <- rownames(cts)
      perarea <- do.call("rbind",strsplit(an,"-"))
@@ -192,24 +192,22 @@ shinyServer(function(input, output, session) {
 
      })
      output$plot4 <- renderPlot({
-         print(groupInfo$ngroup)
          plot2dim(cts.ca,groupInfo$ngroup)
      })
-     grp=as.numeric(st_intersects(points_sf,do.call("rbind",drawnPolygons$polygons)))
+     grp=as.numeric(st_intersects(points_sf,polygons))
      grp=ifelse(is.na(grp),"black",areapal[grp+1])
      groupInfo$group <- grp
      leafletProxy("map") |>
        clearGroup("sites") |>
-       addPolygons(data = do.call(rbind, drawnPolygons$polygons), fillColor = "transparent", stroke = TRUE) |>
+       addPolygons(data =  polygons, fillColor = "transparent", stroke = TRUE) |>
        addCircleMarkers(data = points_sf, radius = 3, color = groupInfo$group, group = "sites")
   })
 
 
   observeEvent(input$clear_polygons_btn, {
-    drawnPolygons$polygons <- list()  # Clear the stored polygons
+    polygons(NULL)
     groupInfo$ngroup <- 1
     groupInfo$group <- 1
-    
     leafletProxy("map") |>
       clearMarkers()  |>
       addCircleMarkers(data = points_sf, radius = 3, color = "black", group = "sites") 
@@ -232,23 +230,19 @@ shinyServer(function(input, output, session) {
     })
   }
   
-  handleFileUpload <- function() {
-    if (!is.null(input$file_upload)) {
-      handleFileSelection() # Use the uploaded file for grouping
-      showNotification("Using uploaded file for taxon grouping.", type = "message")
-    }
-  }
-     observeEvent(input$shapefile, {
-       req(input$shapefile)
 
-       uploaded_polygons <- st_read(input$shapefile$datapath)
-       drawnPolygons <- reactiveValues(polygons = lapply(1:length(uploaded_polygons[[3]]),function(i)uploaded_polygons[[3]][i,]))
-       print("new_polygon")
-       print(drawnPolygons)
-       
-       
-     })
-
+  observeEvent(input$shapefile, {
+    print("--upload shp--")
+    req(input$shapefile)
+    uploaded_polygons <- st_read(input$shapefile$datapath)
+    print("--upload poly--")
+    print(uploaded_polygons)
+    polygons(uploaded_polygons)
+    grp=as.numeric(st_intersects(points_sf,uploaded_polygons))
+    grp=ifelse(is.na(grp),"black",areapal[grp+1])
+    groupInfo$group <- grp
+    groupInfo$ngroup <- length(uploaded_polygons)
+  })
 
 
 })

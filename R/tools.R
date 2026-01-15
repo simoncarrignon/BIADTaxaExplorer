@@ -7,7 +7,13 @@ groupTaxons <- function(dataset,filename="groupings/faunal_taxa/group_IV.csv",lo
     lot  <-  sapply(gdata[,3],split_plus) #list of taxon
     names(lot)=txl
     grouping=lot
-    correspTx = unlist(lapply(names(grouping),function(e){names(grouping[[e]])=grouping[[e]];grouping[[e]][]=e;grouping[[e]]}))
+    #correspTx = unlist(lapply(names(grouping),function(e){names(grouping[[e]])=grouping[[e]];grouping[[e]][]=e;grouping[[e]]}))
+    correspTx = c()
+    for(e in names(grouping)){
+        a=rep(e,length(grouping[[e]]))
+        names(a)=grouping[[e]]
+        correspTx=c(correspTx,a)
+    }
     dataset$new_txgroups = correspTx[dataset$TaxonCode]
     if(logging)print(paste0("grouping ",length(unique(dataset$TaxonCode))," Taxons in  ",length(grouping)," larger categories, ",length(unique(dataset$TaxonCode[is.na(dataset$new_txgroups)]))," not matched.") )
     return(dataset)

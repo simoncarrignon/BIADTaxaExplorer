@@ -15,6 +15,7 @@ ui <- fluidPage(
   actionButton("run_btn", "Run Analysis"),
   actionButton("clear_polygons_btn", "Clear Polygons"),
   downloadButton("download_polygons", "Download Polygons"),
+  fileInput("shapefile", "Upload Polygons (.gpkg)", accept = ".gpkg"),
   downloadButton("download_table", "Download Data"),
   fluidRow(
     column(width = 6,

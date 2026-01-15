@@ -143,12 +143,13 @@ shinyServer(function(input, output, session) {
   
   
   observeEvent(input$run_btn, { 
+                   drawnPolygons <- drawnPolygons()
      if(is.null(drawnPolygons$polygons) || length(drawnPolygons$polygons)==0)
      {
          showNotification("Please draw at least one area before proceeding.", type = "warning");
          return()
      }
-     saveRDS(drawnPolygons$polygons, file = "groupings/spatial/groups.RDS");
+     #saveRDS(drawnPolygons$polygons, file = "groupings/spatial/groups.RDS");
      groups <- do.call("rbind",drawnPolygons$polygons) #that should be a multipolygon with ach area manually selected
      cur_data=taxon_dataset()
      st_crs(cur_data)=st_crs(groups)
@@ -237,6 +238,17 @@ shinyServer(function(input, output, session) {
       showNotification("Using uploaded file for taxon grouping.", type = "message")
     }
   }
+     observeEvent(input$shapefile, {
+       req(input$shapefile)
+
+       uploaded_polygons <- st_read(input$shapefile$datapath)
+       drawnPolygons <- reactiveValues(polygons = lapply(1:length(uploaded_polygons[[3]]),function(i)uploaded_polygons[[3]][i,]))
+       print("new_polygon")
+       print(drawnPolygons)
+       
+       
+     })
+
 
 
 })

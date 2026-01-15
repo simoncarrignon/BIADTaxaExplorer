@@ -101,8 +101,8 @@ plotCAarrows <- function(cares){
     points(cares$row$coord[,1:2],col=areapal[gp+1],pch=20)
     text(cares$row$coord[,1:2],an,col=areapal[gp+1],pos=3)
 
-    for(g in 1:2){
-        gp.coor=cares$row$coord[gp==g,1:2]
+    for(g in 1:max(gp)){
+        gp.coor <- cares$row$coord[gp==g,1:2]
         gp.coor <- shorten_arrows(gp.coor,.03)
         arrows( x0=gp.coor[,1],x1=gp.coor[,3],y0=gp.coor[,2],y1=gp.coor[,4],col=areapal[g+1],lw=1,length=.1)
     }

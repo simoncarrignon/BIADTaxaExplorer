@@ -80,29 +80,52 @@ shinyServer(function(input, output, session) {
   )
 
   
-  observeEvent(input$file_selector_tx, {
-    selected_file <- input$file_selector_tx
-    taxon_new <-taxon_dataset()
+  #observeEvent(input$file_selector_tx, {
+  #  selected_file <- input$file_selector_tx
+  #  taxon_new <-taxon_dataset()
 
-    taxon_new <- groupTaxons(taxon_new,selected_file)
-    taxon_dataset(taxon_new)  # Update the reactive value
-    output$taxon_table <- renderText({
-         ns=lengths(tapply(taxon_new$TaxonCode,taxon_new$new_txgroups,unique))
-         paste("\t\t<i> groups are: ", paste0(paste(names(ns),":",ns,"tx"),collapse=", "),"</i>  ")
-        })
+  #  taxon_new <- groupTaxons(taxon_new,selected_file)
+  #  taxon_dataset(taxon_new)  # Update the reactive value
+  #  output$taxon_table <- renderText({
+  #       ns=lengths(tapply(taxon_new$TaxonCode,taxon_new$new_txgroups,unique))
+  #       paste("\t\t<i> groups are: ", paste0(paste(names(ns),":",ns,"tx"),collapse=", "),"</i>  ")
+  #      })
 
+  #})
+  observeEvent(input$upload_own_grouping, {
+    # Trigger file input
+    shinyjs::reset("file_upload") # Reset file input
+    updateTabsetPanel(session, "sidebar", "tab_upload") # Ensure file input is visible to the user
   })
+  observeEvent(input$file_selector_tx, {
+    handleFileSelection()
+  })
+
   observeEvent(input$file_selector_per, {
      taxon_new <- taxon_dataset()
      if(input$file_selector_per == "auto"){
          abs_periods=seq(input$start_value,input$end_value,-(input$duration))
          taxon_new$new_periods <- cut(taxon_new$GMM,breaks=abs_periods,label=rev(abs_periods[-length(abs_periods)]))
+         print(taxon_new$new_periods)
      }
      else if(input$file_selector_per == "groupings/periods/periods.csv"){
          taxon_new$new_periods <- groupPeriod(taxon_new$Period,input$file_selector_per)
          taxon_new$new_periods <- factor(taxon_new$new_periods,levels=c("Neolithic","Eneolithic","Bronze Age","Early Iron Age"),ordered=T)
      }
      taxon_dataset(taxon_new)  
+  })
+
+  observeEvent({
+    input$start_value
+    input$end_value
+    input$duration
+  }, {
+    taxon_new <- taxon_dataset()
+  print("update")
+  print(paste(input$end_value,input$duration,input$start_value))
+    abs_periods <- seq(input$start_value, input$end_value, -(input$duration))
+    taxon_new$new_periods <- cut(taxon_new$GMM, breaks = abs_periods, labels = rev(abs_periods[-length(abs_periods)]))
+    taxon_dataset(taxon_new)
   })
 
   observeEvent(input$map_draw_new_feature, {
@@ -191,6 +214,29 @@ shinyServer(function(input, output, session) {
       addCircleMarkers(data = points_sf, radius = 3, color = "black", group = "sites") 
 
   })
+
+  handleFileSelection <- function() {
+    selected_file <- if (!is.null(input$file_upload)) {
+      input$file_upload$datapath
+    } else {
+      input$file_selector_tx
+    }
+    
+    taxon_new <- taxon_dataset()
+    taxon_new <- groupTaxons(taxon_new, selected_file)
+    taxon_dataset(taxon_new)  # Update the reactive value
+    output$taxon_table <- renderText({
+      ns <- lengths(tapply(taxon_new$TaxonCode, taxon_new$new_txgroups, unique))
+      paste("\t\t<i> groups are: ", paste0(paste(names(ns), ":", ns, "tx"), collapse = ", "), "</i>  ")
+    })
+  }
+  
+  handleFileUpload <- function() {
+    if (!is.null(input$file_upload)) {
+      handleFileSelection() # Use the uploaded file for grouping
+      showNotification("Using uploaded file for taxon grouping.", type = "message")
+    }
+  }
 
 
 })

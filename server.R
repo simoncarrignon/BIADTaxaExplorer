@@ -4,6 +4,18 @@ library(shiny)
 library(jsonlite)
 library(geojsonsf)
 
+split_periods <- function(dataset,selection,start,end,len){
+     if(selection == "auto"){
+         abs_periods=seq(start,end,-(len))
+         new_periods <- cut(dataset$GMM,breaks=abs_periods,label=rev(abs_periods[-length(abs_periods)]))
+     }
+     else if(selection == "groupings/periods/periods.csv"){
+         new_periods <- groupPeriod(dataset$Period,selection)
+         new_periods <- factor(new_periods,levels=c("Neolithic","Eneolithic","Bronze Age","Early Iron Age"),ordered=T)
+     }
+     return(new_periods)
+}
+
 shinyServer(function(input, output, session) {
   print(Sys.time())
   check.conn(conn)
@@ -15,6 +27,7 @@ shinyServer(function(input, output, session) {
   taxon_dataset(allBTaxa)  # You should load the initial data here
 
   observeEvent(input$data_type_selector, {
+    print("changing dataset")
     sel <- input$data_type_selector
     type <- ifelse(sel == "Faunal", "faunal_taxa/", "botanical_taxa/")
     path <- file.path("groupings",type)
@@ -26,6 +39,7 @@ shinyServer(function(input, output, session) {
         dataset <- allFTaxa
     else
         dataset <- allBTaxa
+     dataset$new_periods  <- split_periods( dataset=dataset,selection=input$file_selector_per,start=input$start_value,end=input$end_value,len=input$duration)
     head(dataset)
     taxon_dataset(dataset)
     output$plot1 <- renderPlot({})
@@ -51,7 +65,7 @@ shinyServer(function(input, output, session) {
            editOptions = F,
            polylineOptions = F, rectangleOptions = F, circleOptions = F,
            markerOptions = F, circleMarkerOptions = F
-        )
+        ) 
       maps
   })
 
@@ -91,28 +105,21 @@ shinyServer(function(input, output, session) {
   })
 
   observeEvent(input$file_selector_per, {
+     print("updating dataset period")
      taxon_new <- taxon_dataset()
-     if(input$file_selector_per == "auto"){
-         abs_periods=seq(input$start_value,input$end_value,-(input$duration))
-         taxon_new$new_periods <- cut(taxon_new$GMM,breaks=abs_periods,label=rev(abs_periods[-length(abs_periods)]))
-     }
-     else if(input$file_selector_per == "groupings/periods/periods.csv"){
-         taxon_new$new_periods <- groupPeriod(taxon_new$Period,input$file_selector_per)
-         taxon_new$new_periods <- factor(taxon_new$new_periods,levels=c("Neolithic","Eneolithic","Bronze Age","Early Iron Age"),ordered=T)
-     }
+     taxon_new$new_periods  <- split_periods( dataset=taxon_new,selection=input$file_selector_per,start=input$start_value,end=input$end_value,len=input$duration)
      taxon_dataset(taxon_new)  
   })
 
+  #maybe merge the one above and the one below?
   observeEvent({
       input$start_value
       input$end_value
       input$duration
   }, {
       taxon_new <- taxon_dataset()
-      print("update")
-      print(paste(input$end_value,input$duration,input$start_value))
-      abs_periods <- seq(input$start_value, input$end_value, -(input$duration))
-      taxon_new$new_periods <- cut(taxon_new$GMM, breaks = abs_periods, labels = rev(abs_periods[-length(abs_periods)]))
+      print("update periods")
+     taxon_new$new_periods  <- split_periods( dataset=taxon_new,selection="auto",start=input$start_value,end=input$end_value,len=input$duration)
       taxon_dataset(taxon_new)
       output$plot1 <- renderPlot({})
       output$plot2 <- renderPlot({})
@@ -123,7 +130,6 @@ shinyServer(function(input, output, session) {
   observeEvent(input$map_draw_new_feature, {
     feature <- input$map_draw_new_feature
     pol <- geojson_sf(jsonlite::toJSON(feature,auto_unbox=T))
-    print(pol)
     prev_pol <- polygons()
     polygons <- rbind(prev_pol, pol)
     polygons(polygons)
@@ -151,7 +157,6 @@ shinyServer(function(input, output, session) {
      #saveRDS(drawnPolygons$polygons, file = "groupings/spatial/groups.RDS");
      groups <- length(polygons) #that should be a multipolygon with ach area manually selected
      print("---start analysis")
-     print(polygons)
      cur_data <- taxon_dataset()
      st_crs(cur_data) <- st_crs(polygons)
      cur_data$new_area  <- as.numeric(st_intersects(cur_data,polygons))
@@ -169,7 +174,7 @@ shinyServer(function(input, output, session) {
          showNotification("Some taxon are missing from some periods/area, we will assume they are asbent (ie replace NA by 0) of the group", type = "warning")
          cts[is.na(cts)] <- 0
          nullrow <- apply(cts,1,sum) == 0
-         cts <- cts[!nullrow,] 
+         cts <- cts[!nullrow,,drop=FALSE] 
      }
      cts.ca <- FactoMineR::CA(cts,graph=F)
      an <- rownames(cts)
@@ -185,11 +190,9 @@ shinyServer(function(input, output, session) {
          bySpeciesComposition(subregions,cnt)
      })
      output$plot3 <- renderPlot({
-
          if(!(is.null(dim(cts.ca$row$coord)))){
              plotCAarrows(cts.ca)
          }
-
      })
      output$plot4 <- renderPlot({
          plot2dim(cts.ca,groupInfo$ngroup)

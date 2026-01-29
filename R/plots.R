@@ -6,7 +6,8 @@ bySpeciesComposition <- function(dataset,cnt){
         region=dataset[dataset$new_area == i,]
         region.freq <- t(tapply(region[[cnt]],list(region$new_periods,region$new_txgroups),function(i)sum(i,na.rm=T)))
        region.freq <- apply(region.freq,2,function(i)i/sum(i,na.rm=T))
-        barplot(region.freq[,ncol(region.freq):1],legend=(i==ngroups),args.legend=list(bg="white",cex=.75),space=0,main=paste("Area",i),col=cols,lwd=.1,border=.6)
+       region.freq[is.na(region.freq)] <- 0
+        barplot(region.freq[,ncol(region.freq):1],legend=(i==ngroups),args.legend=list(bg="white",cex=.75),space=0,main=paste("Area",i),col=cols,lwd=.1,border=.6,las=3)
     }
 }
 

@@ -70,7 +70,7 @@ plotPhase <- function(data){
 plotCAarrows <- function(cares){
     an <- rownames(cares$row$coord)
     gp <- as.numeric(gsub("(\\d+)-(\\d)","\\2",an))
-    # Function to calculate a shorter arrow length
+#    # Function to calculate a shorter arrow length
     shorten_arrows <- function(gp.coords, shorten_length = 0.03) {
         max_index <- nrow(gp.coords)
         xy0=gp.coords[max_index:2, 1:2]
@@ -95,18 +95,101 @@ plotCAarrows <- function(cares){
     }
 
     # Prepare your arrows with the shortened lengths
-
+    ipar=par()
+    par(xpd=T)
     plot(cares$row$coord[,1:2],col=areapal[gp+1],pch=20,type="n")
     abline(v=0,lty=2,lwd=1.2)#(cts.ca$row$coord[,1:2],col=areapal[gp+1],pch=20)
     abline(h=0,lty=2,lwd=1.2)#(cts.ca$row$coord[,1:2],col=areapal[gp+1],pch=20)
     points(cares$row$coord[,1:2],col=areapal[gp+1],pch=20)
+    text(cares$row$coord[,1:2],an,col=1,pos=3,font=2)
     text(cares$row$coord[,1:2],an,col=areapal[gp+1],pos=3)
+    #TeachingDemos::shadowtext(cares$row$coord[,1],cares$row$coord[,2],an,col=areapal[gp+1],pos=3)
 
     for(g in 1:max(gp)){
         gp.coor <- cares$row$coord[gp==g,1:2]
         gp.coor <- shorten_arrows(gp.coor,.03)
-        arrows( x0=gp.coor[,1],x1=gp.coor[,3],y0=gp.coor[,2],y1=gp.coor[,4],col=areapal[g+1],lw=1,length=.1)
+        arrows( x0=gp.coor[,1],x1=gp.coor[,3],y0=gp.coor[,2],y1=gp.coor[,4],col=areapal[g+1],length=.1,lwd=3)
     }
 
     text(cares$col$coord[,1:2],rownames(cares$col$coord),col="dark green",font=3)
+    par(xpd=F)
+}
+
+
+ggplotversion <- function(){
+library(ggplot2)
+library(ggrepel)
+library(dplyr) # Helpful for data manipulation
+
+# 1. Create a clean data frame for the ROW points
+df_rows <- data.frame(
+  x = cares$row$coord[, 1],
+  y = cares$row$coord[, 2],
+  group = factor(gp),       # Convert group to factor for coloring
+  label = an                # Your labels
+)
+
+# 2. Create a clean data frame for the COL points
+df_cols <- data.frame(
+  x = cares$col$coord[, 1],
+  y = cares$col$coord[, 2],
+  label = rownames(cares$col$coord)
+)
+
+# 3. Handle the Arrows
+# Since you have a custom logic `shorten_arrows` inside a loop, 
+# we need to pre-calculate the start/end coordinates for the segments.
+# Assuming `shorten_arrows` returns a matrix with columns: x0, y0, x1, y1
+arrow_list <- list()
+
+for(g in 1:max(gp)){
+  gp.coor <- cares$row$coord[gp == g, 1:2]
+  
+  # Apply your custom function
+  # Note: Ensure shorten_arrows returns a matrix/df with 4 columns (x0, y0, x1, y1)
+  coords_arrow <- shorten_arrows(gp.coor, .03) 
+  
+  # Store with the group ID
+  arrow_list[[g]] <- data.frame(
+    x = coords_arrow[, 1], # x0
+    y = coords_arrow[, 2], # y0
+    xend = coords_arrow[, 3], # x1
+    yend = coords_arrow[, 4], # y1
+    group = factor(g)
+  )
+}
+df_arrows <- do.call(rbind, arrow_list)
+
+ggplot() + 
+  # --- Reference Lines (v=0, h=0) ---
+  geom_vline(xintercept = 0, linetype = 2, size = 0.6, color = "black") +
+  geom_hline(yintercept = 0, linetype = 2, size = 0.6, color = "black") +
+  
+  # --- Row Points ---
+  geom_point(data = df_rows, aes(x = x, y = y, color = group+1), size = 3) +
+  
+  # --- Arrows ---
+  geom_segment(data = df_arrows, 
+               aes(x = x, y = y, xend = xend, yend = yend, color = group+1),
+               arrow = arrow(length = unit(0.1, "inches")), 
+               size = 1.2) +
+  
+  # --- Row Labels (The "Text with Border" Magic) ---
+  # bg.color creates the white outline (halo). bg.r controls thickness.
+  geom_text_repel(data = df_rows, 
+                  aes(x = x, y = y, label = label, color = group+1),
+                  bg.color = "black", # The border color
+                  bg.r = 0.15,        # The border thickness
+                  fontface = "bold",
+                  seed = 42) +        # Keeps labels in same place on redraws
+  
+  # --- Column Labels (Green text) ---
+  geom_text(data = df_cols, 
+            aes(x = x, y = y, label = label), 
+            color = "darkgreen", fontface = "italic") +
+  
+  # --- Styling ---
+  scale_color_manual(values = areapal) + # Use your custom palette 'areapal'
+  theme_minimal() +
+  theme(legend.position = "none") # Remove legend if not needed
 }

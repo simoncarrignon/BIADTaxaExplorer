@@ -1,0 +1,7 @@
+,IID -  Hulled or Naked forms for Wheat and Barley,
+,"Simon, I suggest for domesticated plants we need to organize three groups: Group IIA (big groups - to understand the overall economic balance of cereals, legumes, and others), Group IIB (large economically important groups), and Group IIC (more narrow subgroups, but this can be very important for some types of analysis of cereals-pulses sets - for example, only hull-less types of wheat and barley, and how different legumes are spread. Such specific sets of crops are can be related to certain cultures). That is, these are three levels of aggregation, they are marked in red in the table.",
+1,Hulled barley,HORDSRT+HORSHUL+HORSHUS
+2,Naked barley,HORDDIN+HORSNAK+HORSNAS
+3,Glume wheat (Hulled),TRITDIC+TRITDIO+TRITMON+TRITMOT+TRITMOD+TRITNGW+TRITTIM+TRITGLW+TRDINGW+TRIDISP+TRIDITI+TRIMODI+TRMODIS+TRMODIT+TRITMGW+TRITMOTI+TRITSPL
+4,Free Threshing wheat (Naked),TRIACO+TRIAEST+TRITCOM+TRITDUR+TRITFTW+TRITWH+TRIAETU+TRIANPA+TRITDUT+TRITPAR+TRIFTWT+TRITSPH
+

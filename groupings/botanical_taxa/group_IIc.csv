@@ -1,0 +1,12 @@
+,IIC - Subgroups of domestic cereals and pulses,
+,"Simon, I suggest for domesticated plants we need to organize three groups: Group IIA (big groups - to understand the overall economic balance of cereals, legumes, and others), Group IIB (large economically important groups), and Group IIC (more narrow subgroups, but this can be very important for some types of analysis of cereals-pulses sets - for example, only hull-less types of wheat and barley, and how different legumes are spread. Such specific sets of crops are can be related to certain cultures). That is, these are three levels of aggregation, they are marked in red in the table.",
+1,Broomcorn millet,PANIMIL+PANISPE
+2,Foxtail millet,SETAITA
+3,Hulled barley,HORDSRT + HORSHUL + HORSHUS
+4,HORDDIN + HORSNAK + HORSNAS
+5,Free Threshing wheat,TRIACO + TRIAEST + TRITCOM + TRITDUR + TRITFTW + TRITWH + TRIAETU + TRIANPA + TRITDUT + TRITPAR + TRIFTWT + TRITSPH
+6,Glume wheat ,TRITDIC + TRITDIO + TRITMON + TRITMOT + TRITMOD + TRITNGW + TRITTIM + TRITGLW + TRDINGW + TRIDISP + TRIDITI + TRIMODI + TRMODIS + TRMODIT + TRITMGW + TRITMOTI + TRITSPL
+7,Lentil,LENSCUL+LENSSPE+LENSVIC
+8,Pea,PISUSAA+PISUSAT+PISUSPE
+9,Vetches,VICIERV + VICIFAB + VICISAT + VICSYFA
+

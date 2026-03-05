@@ -28,6 +28,7 @@ ui <- fluidPage(
     ),
   ),
   selectInput("file_selector_per", "How to group periods", choices = list("Auto"="auto","Period Name"="groupings/periods/periods.csv"),selected="auto",width="150px"),
+  checkboxInput("use_logs", "Use Logs", FALSE),  
   conditionalPanel(
     condition = "input.file_selector_per == 'auto'",
     fluidRow(

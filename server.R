@@ -168,6 +168,7 @@ shinyServer(function(input, output, session) {
 
      print("running CA")
      cts <- tapply(subregions[[cnt]],list(subregions$phase,subregions$new_txgroups),sum,na.rm=T)
+     if(input$use_logs)cts <- log(cts+1)
 
      if(any(is.na(cts)))
      { 

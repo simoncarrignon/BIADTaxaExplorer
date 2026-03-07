@@ -1,6 +1,6 @@
-section_card <- function(title, subtitle = NULL, ..., step = NULL) {
+section_card <- function(title, subtitle = NULL, ..., step = NULL, class_name = NULL) {
   div(
-    class = "card",
+    class = paste("card", class_name),
     if (!is.null(step)) div(class = "step-label", step),
     tags$h3(class = "card-title", title),
     if (!is.null(subtitle)) tags$p(class = "helper-text", subtitle),
@@ -169,9 +169,22 @@ build_analysis_status_ui <- function(result, stale) {
 }
 
 app_ui <- function() {
-  fluidPage(
+  bslib::page_fluid(
+    title = "BIAD Taxa Explorer",
+    theme = bslib::bs_theme(
+      version = 5,
+      base_font = bslib::font_google("Inter"),
+      bg = "#eef3f8",
+      fg = "#142133",
+      primary = "#1976D2",
+      secondary = "#111827",
+      success = "#2e7d32",
+      info = "#1976D2",
+      warning = "#f59e0b",
+      border_radius = "0.35rem",
+      btn_border_radius = "0.25rem"
+    ),
     tags$head(
-      tags$title("BIAD Taxa Explorer"),
       tags$link(rel = "stylesheet", type = "text/css", href = "app.css")
     ),
     div(
@@ -208,129 +221,206 @@ app_ui <- function() {
         column(
           width = 4,
           div(
-            class = "sticky-column",
-            section_card(
-              title = "Data and study areas",
-              subtitle = "Choose the dataset, taxon grouping, and polygons to analyse.",
-              step = "Step 1",
-              selectInput(
-                "data_type_selector",
-                "Dataset",
-                choices = c("Faunal", "Botanical"),
-                selected = "Faunal"
-              ),
-              selectInput("file_selector_tx", "Taxon grouping", choices = character(0)),
-              uiOutput("taxon_table"),
-              fileInput("shapefile", "Upload polygons (.gpkg)", accept = ".gpkg"),
-              actionButton(
-                "clear_polygons_btn",
-                "Clear polygons",
-                class = "btn-default btn-block"
-              )
-            ),
-            section_card(
-              title = "Time controls",
-              subtitle = "Pick predefined archaeological periods or build fixed BP slices.",
-              step = "Step 2",
-              selectInput(
-                "file_selector_per",
-                "Period grouping",
-                choices = c(
-                  "Automatic time slices" = "auto",
-                  "Named archaeological periods" = "groupings/periods/periods.csv"
+            class = "app-sidebar-shell",
+            div(
+              class = "sticky-column",
+              section_card(
+                title = "Data and study areas",
+                subtitle = "Choose the dataset, taxon grouping, and polygons to analyse.",
+                step = "Step 1",
+                class_name = "sidebar-card",
+                div(
+                  class = "sidebar-subsection",
+                  selectInput(
+                    "data_type_selector",
+                    "Dataset",
+                    choices = c("Faunal", "Botanical"),
+                    selected = "Faunal"
+                  ),
+                  selectInput("file_selector_tx", "Taxon grouping", choices = character(0)),
+                  uiOutput("taxon_table")
                 ),
-                selected = "auto"
-              ),
-              conditionalPanel(
-                condition = "input.file_selector_per == 'auto'",
-                fluidRow(
-                  column(6, numericInput("start_value", "Older BP", value = 8500, min = 0, width = "100%")),
-                  column(6, numericInput("end_value", "Younger BP", value = 2500, min = 0, width = "100%"))
-                ),
-                sliderInput(
-                  "duration",
-                  "Slice size (years BP)",
-                  min = 100,
-                  max = 1000,
-                  value = 500,
-                  step = 50,
-                  width = "100%"
+                div(
+                  class = "sidebar-subsection sidebar-action-surface",
+                  tags$div(class = "sidebar-subsection-title", "Study area polygons"),
+                  tags$p(
+                    class = "sidebar-subsection-help",
+                    "Upload a GeoPackage here, or draw polygons directly on the map."
+                  ),
+                  fileInput("shapefile", "Upload polygons (.gpkg)", accept = ".gpkg"),
+                  actionButton(
+                    "clear_polygons_btn",
+                    "Clear polygons",
+                    class = "btn-default btn-block sidebar-secondary-btn sidebar-danger-btn"
+                  )
                 )
               ),
-              checkboxInput("use_logs", "Apply log(count + 1) before CA", FALSE)
-            ),
-            section_card(
-              title = "Run and export",
-              subtitle = "Analysis only reruns when you ask for it, so the interface stays responsive.",
-              step = "Step 3",
-              div(
-                class = "control-actions",
-                actionButton(
-                  "run_btn",
-                  "Run analysis",
-                  class = "btn-primary btn-lg btn-block"
+              section_card(
+                title = "Time controls",
+                subtitle = "Pick predefined archaeological periods or build fixed BP slices.",
+                step = "Step 2",
+                class_name = "sidebar-card",
+                div(
+                  class = "sidebar-subsection",
+                  selectInput(
+                    "file_selector_per",
+                    "Period grouping",
+                    choices = c(
+                      "Automatic time slices" = "auto",
+                      "Named archaeological periods" = "groupings/periods/periods.csv"
+                    ),
+                    selected = "auto"
+                  )
                 ),
-                downloadButton("download_polygons", "Download polygons", class = "btn-default btn-block"),
-                downloadButton("download_table", "Download results", class = "btn-default btn-block")
+                conditionalPanel(
+                  condition = "input.file_selector_per == 'auto'",
+                  div(
+                    class = "sidebar-subsection sidebar-time-surface",
+                    div(
+                      class = "time-controls-panel",
+                      div(
+                        class = "time-boundary-grid",
+                        div(
+                          class = "time-boundary-field",
+                          numericInput("start_value", "Start (BP)", value = 8500, min = 0, width = "100%")
+                        ),
+                        div(
+                          class = "time-boundary-field",
+                          numericInput("end_value", "End (BP)", value = 3000, min = 0, width = "100%")
+                        )
+                      ),
+                      div(
+                        class = "slider-panel slider-panel--highlight",
+                        div(
+                          class = "slider-panel-heading",
+                          tags$div(class = "slider-panel-label", "Time-slice width"),
+                          tags$p(
+                            class = "slider-panel-help",
+                            "Move the slider to choose the width of each BP slice."
+                          )
+                        ),
+                        sliderInput(
+                          "duration",
+                          NULL,
+                          min = 100,
+                          max = 1000,
+                          value = 500,
+                          step = 50,
+                          width = "100%"
+                        )
+                      )
+                    )
+                  )
+                ),
+                div(
+                  class = "sidebar-option-row",
+                  checkboxInput("use_logs", "Apply log(count + 1) before CA", FALSE)
+                )
+              ),
+              section_card(
+                title = "Run and export",
+                subtitle = "Analysis only reruns when you ask for it, so the interface stays responsive.",
+                step = "Step 3",
+                class_name = "sidebar-card sidebar-actions-card",
+                div(
+                  class = "control-actions",
+                  div(
+                    class = "sidebar-subsection sidebar-run-surface",
+                    tags$div(class = "sidebar-subsection-title", "Run analysis"),
+                    tags$p(
+                      class = "sidebar-subsection-help",
+                      "Charts and tables refresh only when you click Run analysis."
+                    ),
+                    actionButton(
+                      "run_btn",
+                      "Run analysis",
+                      class = "btn-primary btn-lg btn-block sidebar-primary-btn"
+                    )
+                  ),
+                  div(
+                    class = "sidebar-subsection sidebar-export-surface",
+                    tags$div(class = "sidebar-subsection-title", "Export"),
+                    tags$p(
+                      class = "sidebar-subsection-help",
+                      "Download the current study polygons or the aggregated results table."
+                    ),
+                    div(
+                      class = "export-actions",
+                      downloadButton(
+                        "download_polygons",
+                        "Download polygons",
+                        class = "btn-default btn-block sidebar-download-btn"
+                      ),
+                      downloadButton(
+                        "download_table",
+                        "Download results",
+                        class = "btn-default btn-block sidebar-download-btn"
+                      )
+                    )
+                  )
+                )
               )
             )
           )
         ),
         column(
           width = 8,
-          section_card(
-            title = "Map and coverage",
-            subtitle = "Draw one or more polygons directly on the map or upload a GeoPackage.",
-            uiOutput("selection_summary"),
-            leafletOutput("map", height = "62vh")
-          ),
-          section_card(
-            title = "Analysis results",
-            subtitle = "Compare raw counts, taxon composition, and correspondence-analysis structure.",
-            uiOutput("analysis_status"),
-            div(
-              class = "results-tabs",
-              tabsetPanel(
-                id = "results_tabs",
-                tabPanel(
-                  "Raw counts",
-                  tags$p(
-                    class = "plot-caption",
-                    "Total counts per period for each selected polygon."
+          div(
+            class = "app-main-shell",
+            section_card(
+              title = "Map and coverage",
+              subtitle = "Draw one or more polygons directly on the map or upload a GeoPackage.",
+              uiOutput("selection_summary"),
+              leafletOutput("map", height = "62vh")
+            ),
+            section_card(
+              title = "Analysis results",
+              subtitle = "Compare raw counts, taxon composition, and correspondence-analysis structure.",
+              uiOutput("analysis_status"),
+              div(
+                class = "results-tabs",
+                tabsetPanel(
+                  id = "results_tabs",
+                  tabPanel(
+                    "Raw counts",
+                    tags$p(
+                      class = "plot-caption",
+                      "Total counts per period for each selected polygon."
+                    ),
+                    plotOutput("plot1", height = "320px")
                   ),
-                  plotOutput("plot1", height = "320px")
-                ),
-                tabPanel(
-                  "Composition",
-                  tags$p(
-                    class = "plot-caption",
-                    "Relative share of taxon groups across periods within each polygon."
+                  tabPanel(
+                    "Composition",
+                    tags$p(
+                      class = "plot-caption",
+                      "Relative share of taxon groups across periods within each polygon."
+                    ),
+                    plotOutput("plot2", height = "340px")
                   ),
-                  plotOutput("plot2", height = "340px")
-                ),
-                tabPanel(
-                  "CA map",
-                  tags$p(
-                    class = "plot-caption",
-                    "Correspondence analysis with arrows that track phase order inside each polygon."
+                  tabPanel(
+                    "CA map",
+                    tags$p(
+                      class = "plot-caption",
+                      "Correspondence analysis with arrows that track phase order inside each polygon."
+                    ),
+                    plotOutput("plot3", height = "520px")
                   ),
-                  plotOutput("plot3", height = "520px")
-                ),
-                tabPanel(
-                  "Dimensions",
-                  tags$p(
-                    class = "plot-caption",
-                    "How the first two CA dimensions evolve across time for each polygon."
+                  tabPanel(
+                    "Dimensions",
+                    tags$p(
+                      class = "plot-caption",
+                      "How the first two CA dimensions evolve across time for each polygon."
+                    ),
+                    plotOutput("plot4", height = "520px")
                   ),
-                  plotOutput("plot4", height = "520px")
-                ),
-                tabPanel(
-                  "Data preview",
-                  tags$p(
-                    class = "plot-caption",
-                    "Preview of the exported aggregated table."
-                  ),
-                  tableOutput("analysis_preview")
+                  tabPanel(
+                    "Data preview",
+                    tags$p(
+                      class = "plot-caption",
+                      "Preview of the exported aggregated table."
+                    ),
+                    tableOutput("analysis_preview")
+                  )
                 )
               )
             )

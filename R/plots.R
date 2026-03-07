@@ -1,195 +1,335 @@
-bySpeciesComposition <- function(dataset,cnt){
-    cols=palette.colors(length(unique(dataset$new_txgroups)),"Pastel 2")
-    ngroups=length(unique(na.omit(dataset$new_area)))
-    par(mfrow=c(1,ngroups),oma=c(3,1,0,0),mar=c(1,1,1,1))
-    for(i in 1:ngroups){
-        region=dataset[dataset$new_area == i,]
-        region.freq <- t(tapply(region[[cnt]],list(region$new_periods,region$new_txgroups),function(i)sum(i,na.rm=T)))
-       region.freq <- apply(region.freq,2,function(i)i/sum(i,na.rm=T))
-       region.freq[is.na(region.freq)] <- 0
-        barplot(region.freq[,ncol(region.freq):1],legend=(i==ngroups),args.legend=list(bg="white",cex=.75),space=0,main=paste("Area",i),col=cols,lwd=.1,border=.6,las=3)
-    }
+empty_plot_message <- function(message) {
+  plot.new()
+  text(0.5, 0.5, message, cex = 1.05)
 }
 
-countTotal<- function(dataset,cnt){
-    ngroups=length(unique(na.omit(dataset$new_area)))
-    areacol <- palette.colors(length(unique(dataset$new_area)),"Pastel 1",recycle=T)
-    counts <- tapply(dataset[[cnt]], list(dataset$new_periods,dataset$new_area ),sum,na.rm=T)
-    plot(counts[,1],type="n",cex=3,lwd=3,ylim=range(counts,na.rm=T),col=areacol[1],ylab=cnt,xaxt="n",xlab="")
-    for(i in 1:ncol(counts))lines(rev(counts[,i]),type="o",cex=3,lwd=3,ylim=range(counts),col=areacol[i])
-    axis(1,    at=seq_along(levels(dataset$new_periods)),label=rev(levels(dataset$new_periods)))
-    legend("topright",lwd=3,pch=1,col=areacol,legend=paste0("area",1:ngroups))
-}
+countTotal <- function(dataset, count_column) {
+  counts <- tapply(
+    dataset[[count_column]],
+    list(dataset$new_periods, dataset$new_area),
+    sum,
+    na.rm = TRUE
+  )
+  counts <- as.matrix(counts)
+  counts[is.na(counts)] <- 0
 
+  if (nrow(counts) == 0 || ncol(counts) == 0) {
+    empty_plot_message("No data available for the selected configuration.")
+    return(invisible(NULL))
+  }
 
-plot2dim <- function(ca.res,ngroup){
-           cares <- ca.res$row$coord
-           if((is.null(dim(cares))))
-               par(mfrow=c(1,1))
-           else
-               par(mfrow=c(2,1))
-           par(oma=c(4,4,2,1),mar=c(0,.5,.5,0),xpd=NA)
+  area_ids <- colnames(counts)
+  area_colors <- palette.colors(max(length(area_ids), 1), "Pastel 1", recycle = TRUE)
+  x_positions <- seq_len(nrow(counts))
+  y_range <- range(counts, na.rm = TRUE)
 
-           if((is.null(dim(cares))))
-               an <- names(cares)
-           else
-               an <- rownames(cares)
+  if (!all(is.finite(y_range))) {
+    y_range <- c(0, 1)
+  }
+  if (diff(y_range) == 0) {
+    y_range <- c(0, y_range[2] + 1)
+  }
 
+  plot(
+    x_positions,
+    counts[, 1],
+    type = "n",
+    xlab = "",
+    ylab = count_column,
+    xaxt = "n",
+    ylim = y_range
+  )
 
-           perarea <- do.call("rbind",strsplit(an,"-"))
-           colnames(perarea) <- c("new_periods","new_area")
-           cares <- cbind.data.frame(perarea,cares)
+  for (column_index in seq_len(ncol(counts))) {
+    lines(
+      x_positions,
+      counts[, column_index],
+      type = "o",
+      lwd = 2.5,
+      pch = 16,
+      col = area_colors[column_index]
+    )
+  }
 
-           areacol <- palette.colors(ngroup,"Pastel 1",recycle=T)
-           if((is.null(dim(ca.res$row$coord)))){
-               colnames(cares)[ncol(cares)]="Dim 1"
-               dim=1
-               plot(1,1,type="n",main="",xlab="",ylab=paste("Dim",dim),xlim=c(1,length(unique(na.omit(cares$new_periods)))),ylim=range(cares[,paste("Dim",dim)]),xaxt="n")
-               lapply(1:ngroup,function(area) lines(sort(cares$new_periods[cares$new_area == area]),cares[cares$new_area == area,paste("Dim",dim)][order(cares$new_periods[cares$new_area == area])],col=areacol[area],lwd=3,type="o"))
-           }
-           else{
-               for(dim in 1:2){
-                   plot(1,1,type="n",main="",xlab="",ylab=paste("Dim",dim),xlim=c(1,length(unique(na.omit(cares$new_periods)))),ylim=range(cares[,paste("Dim",dim)]),xaxt="n")
-                   lapply(1:ngroup,function(area) lines(seq_along(cares$new_periods[cares$new_area == area]),rev(cares[cares$new_area == area,paste("Dim",dim)]),col=areacol[area],lwd=3,type="o"))
-               }
-           }
-           axis(1, at=1+seq_along(unique(cares$new_periods)),label=rev(unique(cares$new_periods)))
-}
-
-plotPhase <- function(data){
-    gms <- unique(st_drop_geometry(data[,c("GMM","GMS")]))
-    gms <- gms[order(gms[,1],decreasing=T),]
-    abs_periods <- seq(8500,2500,-500)
-    plot(1,1,type="n",xlim=range(-9000,-2000),ylim=range(nrow(gms):1))
-    sapply(seq(1,length(abs_periods)-1,2),function(i)rect(-abs_periods[i], -1000, -abs_periods[i + 1], 5500, col = adjustcolor('lightblue',.2), border = NA))
-    segments(x0=-gms[,1]-gms[,2],y0=nrow(gms):1,x1=-gms[,1]+gms[,2],y1=nrow(gms):1,col=adjustcolor(1,.3))
-    points(-gms[,1],nrow(gms):1,cex=.2)
-    abline(v=-abs_periods)
-}
-
-plotCAarrows <- function(cares){
-    an <- rownames(cares$row$coord)
-    gp <- as.numeric(gsub("(\\d+)-(\\d)","\\2",an))
-#    # Function to calculate a shorter arrow length
-    shorten_arrows <- function(gp.coords, shorten_length = 0.03) {
-        max_index <- nrow(gp.coords)
-        xy0=gp.coords[max_index:2, 1:2]
-        xy1=gp.coords[(max_index-1):1, 1:2]
-        x0=xy0[,1]
-        y0=xy0[,2]
-        x1=xy1[,1]
-        y1=xy1[,2]
-
-        # Calculate direction vectors
-        dx <- x1 - x0
-        dy <- y1 - y0
-        distance <- sqrt(dx^2 + dy^2)
-
-        # Normalize and scale the direction
-        x1_new <- x1 - dx/distance * shorten_length
-        y1_new <- y1 - dy/distance * shorten_length
-        x0_new <- x0 + dx/distance * shorten_length
-        y0_new <- y0 + dy/distance * shorten_length
-
-        return(cbind(x0_new, y0_new,x1_new, y1_new))
-    }
-
-    # Prepare your arrows with the shortened lengths
-    ipar=par()
-    par(xpd=T)
-    plot(cares$row$coord[,1:2],col=areapal[gp+1],pch=20,type="n")
-    abline(v=0,lty=2,lwd=1.2)#(cts.ca$row$coord[,1:2],col=areapal[gp+1],pch=20)
-    abline(h=0,lty=2,lwd=1.2)#(cts.ca$row$coord[,1:2],col=areapal[gp+1],pch=20)
-    points(cares$row$coord[,1:2],col=areapal[gp+1],pch=20)
-    text(cares$row$coord[,1:2],an,col=1,pos=3,font=2)
-    text(cares$row$coord[,1:2],an,col=areapal[gp+1],pos=3)
-    #TeachingDemos::shadowtext(cares$row$coord[,1],cares$row$coord[,2],an,col=areapal[gp+1],pos=3)
-
-    for(g in 1:max(gp)){
-        gp.coor <- cares$row$coord[gp==g,1:2]
-        gp.coor <- shorten_arrows(gp.coor,.03)
-        arrows( x0=gp.coor[,1],x1=gp.coor[,3],y0=gp.coor[,2],y1=gp.coor[,4],col=areapal[g+1],length=.1,lwd=3)
-    }
-
-    text(cares$col$coord[,1:2],rownames(cares$col$coord),col="dark green",font=3)
-    par(xpd=F)
-}
-
-
-ggplotversion <- function(){
-library(ggplot2)
-library(ggrepel)
-library(dplyr) # Helpful for data manipulation
-
-# 1. Create a clean data frame for the ROW points
-df_rows <- data.frame(
-  x = cares$row$coord[, 1],
-  y = cares$row$coord[, 2],
-  group = factor(gp),       # Convert group to factor for coloring
-  label = an                # Your labels
-)
-
-# 2. Create a clean data frame for the COL points
-df_cols <- data.frame(
-  x = cares$col$coord[, 1],
-  y = cares$col$coord[, 2],
-  label = rownames(cares$col$coord)
-)
-
-# 3. Handle the Arrows
-# Since you have a custom logic `shorten_arrows` inside a loop, 
-# we need to pre-calculate the start/end coordinates for the segments.
-# Assuming `shorten_arrows` returns a matrix with columns: x0, y0, x1, y1
-arrow_list <- list()
-
-for(g in 1:max(gp)){
-  gp.coor <- cares$row$coord[gp == g, 1:2]
-  
-  # Apply your custom function
-  # Note: Ensure shorten_arrows returns a matrix/df with 4 columns (x0, y0, x1, y1)
-  coords_arrow <- shorten_arrows(gp.coor, .03) 
-  
-  # Store with the group ID
-  arrow_list[[g]] <- data.frame(
-    x = coords_arrow[, 1], # x0
-    y = coords_arrow[, 2], # y0
-    xend = coords_arrow[, 3], # x1
-    yend = coords_arrow[, 4], # y1
-    group = factor(g)
+  axis(1, at = x_positions, labels = rownames(counts), las = 2)
+  legend(
+    "topright",
+    legend = paste("Area", area_ids),
+    col = area_colors,
+    lwd = 2.5,
+    pch = 16,
+    bg = "white",
+    bty = "n"
   )
 }
-df_arrows <- do.call(rbind, arrow_list)
 
-ggplot() + 
-  # --- Reference Lines (v=0, h=0) ---
-  geom_vline(xintercept = 0, linetype = 2, size = 0.6, color = "black") +
-  geom_hline(yintercept = 0, linetype = 2, size = 0.6, color = "black") +
-  
-  # --- Row Points ---
-  geom_point(data = df_rows, aes(x = x, y = y, color = group+1), size = 3) +
-  
-  # --- Arrows ---
-  geom_segment(data = df_arrows, 
-               aes(x = x, y = y, xend = xend, yend = yend, color = group+1),
-               arrow = arrow(length = unit(0.1, "inches")), 
-               size = 1.2) +
-  
-  # --- Row Labels (The "Text with Border" Magic) ---
-  # bg.color creates the white outline (halo). bg.r controls thickness.
-  geom_text_repel(data = df_rows, 
-                  aes(x = x, y = y, label = label, color = group+1),
-                  bg.color = "black", # The border color
-                  bg.r = 0.15,        # The border thickness
-                  fontface = "bold",
-                  seed = 42) +        # Keeps labels in same place on redraws
-  
-  # --- Column Labels (Green text) ---
-  geom_text(data = df_cols, 
-            aes(x = x, y = y, label = label), 
-            color = "darkgreen", fontface = "italic") +
-  
-  # --- Styling ---
-  scale_color_manual(values = areapal) + # Use your custom palette 'areapal'
-  theme_minimal() +
-  theme(legend.position = "none") # Remove legend if not needed
+bySpeciesComposition <- function(dataset, count_column) {
+  area_ids <- sort(unique(na.omit(dataset$new_area)))
+
+  if (length(area_ids) == 0) {
+    empty_plot_message("No selected areas contain grouped data.")
+    return(invisible(NULL))
+  }
+
+  old_par <- par(no.readonly = TRUE)
+  on.exit(par(old_par), add = TRUE)
+
+  par(
+    mfrow = c(1, length(area_ids)),
+    oma = c(2, 0, 0, 0),
+    mar = c(8, 4, 3, 1)
+  )
+
+  for (area_index in seq_along(area_ids)) {
+    area_id <- area_ids[area_index]
+    region <- dataset[dataset$new_area == area_id & !is.na(dataset$new_txgroups), , drop = FALSE]
+    composition <- tapply(
+      region[[count_column]],
+      list(region$new_txgroups, region$new_periods),
+      sum,
+      na.rm = TRUE
+    )
+    composition <- as.matrix(composition)
+    composition[is.na(composition)] <- 0
+    composition <- composition[rowSums(composition) > 0, , drop = FALSE]
+
+    if (nrow(composition) == 0 || ncol(composition) == 0) {
+      empty_plot_message(paste("No grouped taxa for Area", area_id))
+      next
+    }
+
+    proportions <- sweep(composition, 2, colSums(composition), FUN = "/")
+    proportions[is.na(proportions)] <- 0
+    group_colors <- palette.colors(max(nrow(proportions), 1), "Pastel 2", recycle = TRUE)
+
+    barplot(
+      proportions,
+      col = group_colors[seq_len(nrow(proportions))],
+      main = paste("Area", area_id),
+      names.arg = colnames(proportions),
+      las = 2,
+      ylab = "Share of counts",
+      border = NA
+    )
+
+    if (area_index == length(area_ids)) {
+      legend(
+        "topright",
+        legend = rownames(proportions),
+        fill = group_colors[seq_len(nrow(proportions))],
+    bg = "white",
+        bty = "n",
+        cex = 0.8
+      )
+    }
+  }
+}
+
+shorten_segments <- function(coordinates, shorten_length = 0.03) {
+  if (nrow(coordinates) < 2) {
+    return(NULL)
+  }
+
+  start_points <- coordinates[-nrow(coordinates), , drop = FALSE]
+  end_points <- coordinates[-1, , drop = FALSE]
+  delta <- end_points - start_points
+  distance <- sqrt(rowSums(delta^2))
+  valid_rows <- distance > 0
+
+  if (!any(valid_rows)) {
+    return(NULL)
+  }
+
+  start_points <- start_points[valid_rows, , drop = FALSE]
+  end_points <- end_points[valid_rows, , drop = FALSE]
+  delta <- delta[valid_rows, , drop = FALSE]
+  distance <- distance[valid_rows]
+  scale <- shorten_length / distance
+
+  cbind(
+    x0 = start_points[, 1] + delta[, 1] * scale,
+    y0 = start_points[, 2] + delta[, 2] * scale,
+    x1 = end_points[, 1] - delta[, 1] * scale,
+    y1 = end_points[, 2] - delta[, 2] * scale
+  )
+}
+
+present_period_levels <- function(period_values, period_levels = NULL) {
+  if (!is.null(period_levels) && length(period_levels)) {
+    used_periods <- unique(as.character(period_values))
+    period_levels <- period_levels[period_levels %in% used_periods]
+    if (length(period_levels)) {
+      return(period_levels)
+    }
+  }
+
+  resolve_period_levels(period_values)
+}
+
+plotCAarrows <- function(ca_result, period_levels = NULL) {
+  row_coordinates <- as.matrix(ca_result$row$coord)
+  if (is.null(colnames(row_coordinates))) {
+    colnames(row_coordinates) <- paste('Dim', seq_len(ncol(row_coordinates)))
+  }
+  if (ncol(row_coordinates) < 2) {
+    empty_plot_message("At least two CA dimensions are needed for the CA map.")
+    return(invisible(NULL))
+  }
+
+  x_name <- colnames(row_coordinates)[1]
+  y_name <- colnames(row_coordinates)[2]
+  coordinate_frame <- cbind(
+    parse_phase_labels(rownames(row_coordinates)),
+    label = rownames(row_coordinates),
+    as.data.frame(row_coordinates[, 1:2, drop = FALSE], check.names = FALSE)
+  )
+
+  period_levels <- present_period_levels(coordinate_frame$period, period_levels)
+  coordinate_frame$period <- factor(coordinate_frame$period, levels = period_levels, ordered = TRUE)
+  area_ids <- sort(unique(coordinate_frame$area))
+  area_colors <- palette.colors(max(length(area_ids), 1), "Pastel 1", recycle = TRUE)
+
+  plot(
+    row_coordinates[, 1],
+    row_coordinates[, 2],
+    type = "n",
+    xlab = x_name,
+    ylab = y_name
+  )
+  abline(v = 0, h = 0, lty = 2, col = "#9ca3af")
+
+  for (area_index in seq_along(area_ids)) {
+    area_data <- coordinate_frame[coordinate_frame$area == area_ids[area_index], , drop = FALSE]
+    area_data <- area_data[order(area_data$period), , drop = FALSE]
+
+    points(
+      area_data[[x_name]],
+      area_data[[y_name]],
+      pch = 16,
+      cex = 1.2,
+      col = area_colors[area_index]
+    )
+    text(
+      area_data[[x_name]],
+      area_data[[y_name]],
+      labels = area_data$label,
+      pos = 3,
+      cex = 0.8,
+      col = area_colors[area_index]
+    )
+
+    arrow_segments <- shorten_segments(as.matrix(area_data[, c(x_name, y_name)]), 0.03)
+    if (!is.null(arrow_segments)) {
+      arrows(
+        x0 = arrow_segments[, 1],
+        y0 = arrow_segments[, 2],
+        x1 = arrow_segments[, 3],
+        y1 = arrow_segments[, 4],
+        col = area_colors[area_index],
+        length = 0.08,
+        lwd = 2.2
+      )
+    }
+  }
+
+  column_coordinates <- as.matrix(ca_result$col$coord)
+  if (!is.null(column_coordinates) && ncol(column_coordinates) >= 2) {
+    text(
+      column_coordinates[, 1],
+      column_coordinates[, 2],
+      rownames(column_coordinates),
+      col = "darkgreen",
+      font = 3
+    )
+  }
+
+  legend(
+    "topright",
+    legend = paste("Area", area_ids),
+    col = area_colors,
+    pch = 16,
+    bg = "white",
+    lwd = 2.2,
+    bty = "n"
+  )
+}
+
+plot2dim <- function(ca_result, period_levels = NULL) {
+  row_coordinates <- as.matrix(ca_result$row$coord)
+  if (is.null(dim(row_coordinates))) {
+    row_coordinates <- matrix(
+      row_coordinates,
+      ncol = 1,
+      dimnames = list(names(ca_result$row$coord), "Dim 1")
+    )
+  }
+  if (is.null(colnames(row_coordinates))) {
+    colnames(row_coordinates) <- paste('Dim', seq_len(ncol(row_coordinates)))
+  }
+
+  coordinate_frame <- cbind(
+    parse_phase_labels(rownames(row_coordinates)),
+    as.data.frame(row_coordinates, check.names = FALSE)
+  )
+
+  period_levels <- present_period_levels(coordinate_frame$period, period_levels)
+  coordinate_frame$period <- factor(coordinate_frame$period, levels = period_levels, ordered = TRUE)
+  area_ids <- sort(unique(coordinate_frame$area))
+  area_colors <- palette.colors(max(length(area_ids), 1), "Pastel 1", recycle = TRUE)
+  dimensions_to_plot <- seq_len(min(2, ncol(row_coordinates)))
+
+  old_par <- par(no.readonly = TRUE)
+  on.exit(par(old_par), add = TRUE)
+
+  par(mfrow = c(length(dimensions_to_plot), 1), oma = c(4, 4, 1, 1), mar = c(2, 4, 2, 1))
+
+  for (dimension_index in dimensions_to_plot) {
+    dimension_name <- colnames(row_coordinates)[dimension_index]
+    y_values <- coordinate_frame[[dimension_name]]
+    y_range <- range(y_values, na.rm = TRUE)
+
+    if (!all(is.finite(y_range))) {
+      y_range <- c(-1, 1)
+    }
+    if (diff(y_range) == 0) {
+      y_range <- y_range + c(-1, 1)
+    }
+
+    plot(
+      seq_along(period_levels),
+      rep(0, length(period_levels)),
+      type = "n",
+      xlab = "",
+      ylab = dimension_name,
+      xaxt = "n",
+      xlim = c(1, length(period_levels)),
+      ylim = y_range
+    )
+    axis(1, at = seq_along(period_levels), labels = period_levels, las = 2)
+
+    for (area_index in seq_along(area_ids)) {
+      area_data <- coordinate_frame[coordinate_frame$area == area_ids[area_index], , drop = FALSE]
+      area_data <- area_data[order(area_data$period), , drop = FALSE]
+      x_positions <- match(as.character(area_data$period), period_levels)
+
+      lines(
+        x_positions,
+        area_data[[dimension_name]],
+        type = "o",
+        pch = 16,
+        lwd = 2.2,
+        col = area_colors[area_index]
+      )
+    }
+
+    legend(
+      "topright",
+      legend = paste("Area", area_ids),
+      col = area_colors,
+      lwd = 2.2,
+    bg = "white",
+      pch = 16,
+      bty = "n"
+    )
+  }
 }

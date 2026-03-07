@@ -117,8 +117,7 @@ bySpeciesComposition <- function(dataset, count_column) {
         "topright",
         legend = rownames(proportions),
         fill = group_colors[seq_len(nrow(proportions))],
-    bg = "white",
-        bty = "n",
+        bg = "white",
         cex = 0.8
       )
     }
@@ -167,6 +166,10 @@ present_period_levels <- function(period_values, period_levels = NULL) {
 }
 
 plotCAarrows <- function(ca_result, period_levels = NULL) {
+  old_par <- par(no.readonly = TRUE)
+  on.exit(par(old_par), add = TRUE)
+
+  par(xpd = TRUE)  
   row_coordinates <- as.matrix(ca_result$row$coord)
   if (is.null(colnames(row_coordinates))) {
     colnames(row_coordinates) <- paste('Dim', seq_len(ncol(row_coordinates)))
@@ -202,13 +205,7 @@ plotCAarrows <- function(ca_result, period_levels = NULL) {
     area_data <- coordinate_frame[coordinate_frame$area == area_ids[area_index], , drop = FALSE]
     area_data <- area_data[order(area_data$period), , drop = FALSE]
 
-    points(
-      area_data[[x_name]],
-      area_data[[y_name]],
-      pch = 16,
-      cex = 1.2,
-      col = area_colors[area_index]
-    )
+    points( area_data[[x_name]], area_data[[y_name]], pch = 16, cex = 1.2, col = area_colors[area_index])
     text(
       area_data[[x_name]],
       area_data[[y_name]],

@@ -104,6 +104,7 @@ server <- function(input, output, session) {
   output$map <- renderLeaflet({
     leaflet() |>
       addTiles() |>
+      fit_map_to_data(points = selected_sites()) |>
       addDrawToolbar(
         targetGroup = "selected-polygons",
         polygonOptions = drawPolygonOptions(showArea = TRUE),
@@ -115,6 +116,11 @@ server <- function(input, output, session) {
         circleMarkerOptions = FALSE
       )
   })
+
+  observeEvent(selected_sites(), {
+    leafletProxy("map") |>
+      fit_map_to_data(points = selected_sites())
+  }, ignoreInit = TRUE)
 
   observe({
     points <- selected_sites()

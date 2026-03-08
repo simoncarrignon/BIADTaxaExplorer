@@ -353,6 +353,9 @@ body {
   background: transparent;
   color: var(--biad-muted);
 }
+.app-sidebar-shell .irs--shiny .irs-handle > i:not(:first-child) {
+  display: none;
+}
 
 .app-sidebar-shell .irs--shiny .irs-single,
 .app-sidebar-shell .irs--shiny .irs-from,

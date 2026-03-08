@@ -106,3 +106,50 @@ site_popup_label <- function(points) {
     points$Country
   )
 }
+
+has_sf_features <- function(data) {
+  inherits(data, "sf") && !is.null(data) && nrow(data) > 0
+}
+
+combined_map_geometry <- function(points = NULL, polygons = NULL) {
+  geometries <- list()
+
+  if (has_sf_features(points)) {
+    geometries[[length(geometries) + 1]] <- sf::st_geometry(points)
+  }
+
+  if (has_sf_features(polygons)) {
+    geometries[[length(geometries) + 1]] <- sf::st_geometry(polygons)
+  }
+
+  if (!length(geometries)) {
+    return(NULL)
+  }
+
+  do.call(c, geometries)
+}
+
+fit_map_to_data <- function(map, points = NULL, polygons = NULL, pad_fraction = 0.05, min_span = 0.1) {
+  geometry <- combined_map_geometry(points = points, polygons = polygons)
+  if (is.null(geometry) || length(geometry) == 0) {
+    return(map)
+  }
+
+  if (!is.na(sf::st_crs(geometry)) && !isTRUE(sf::st_is_longlat(geometry))) {
+    geometry <- sf::st_transform(geometry, 4326)
+  }
+
+  bbox <- sf::st_bbox(geometry)
+  x_span <- as.numeric(bbox[["xmax"]] - bbox[["xmin"]])
+  y_span <- as.numeric(bbox[["ymax"]] - bbox[["ymin"]])
+  x_pad <- max(x_span * pad_fraction, min_span)
+  y_pad <- max(y_span * pad_fraction, min_span)
+
+  leaflet::fitBounds(
+    map,
+    lng1 = as.numeric(bbox[["xmin"]] - x_pad),
+    lat1 = as.numeric(bbox[["ymin"]] - y_pad),
+    lng2 = as.numeric(bbox[["xmax"]] + x_pad),
+    lat2 = as.numeric(bbox[["ymax"]] + y_pad)
+  )
+}

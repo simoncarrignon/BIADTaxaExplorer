@@ -238,13 +238,29 @@ app_ui <- function() {
                     selected = "Faunal"
                   ),
                   selectInput("file_selector_tx", "Taxon grouping", choices = character(0)),
-                  div(
-                    class = "group-management-actions",
-                    fileInput("upload_group", "Upload new group (.csv)", accept = ".csv"),
+                  tags$details(
+                    style = "margin-top: 4px; font-size: 11px;",
+                    tags$summary(
+                      style = "color: #999; cursor: pointer; user-select: none;",
+                      "group file options"
+                    ),
                     div(
-                      class = "group-management-buttons",
-                      downloadButton("download_group", "Download group CSV"),
-                      actionButton("edit_group", "Edit group labels", class = "btn-default")
+                      style = "margin-top: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;",
+                      fileInput("upload_group", NULL,
+                        accept = ".csv",
+                        buttonLabel = "Upload .csv",
+                        placeholder = "no file selected",
+                        width = "100%"
+                      ),
+                      div(
+                        style = "display: flex; gap: 8px; margin-top: -10px;",
+                        downloadButton("download_group", "↓ download",
+                          style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
+                        ),
+                        actionButton("edit_group", "✎ edit labels",
+                          style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
+                        )
+                      )
                     )
                   ),
                   uiOutput("taxon_table")

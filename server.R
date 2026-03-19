@@ -279,48 +279,6 @@ server <- function(input, output, session) {
     }
   )
 
-  # ── Group management: upload ──────────────────────────────────────────────────
-  observeEvent(input$upload_group, {
-    req(input$upload_group$datapath)
-
-    tryCatch({
-      uploaded <- utils::read.csv(input$upload_group$datapath, header = TRUE,
-                                  stringsAsFactors = FALSE)
-
-      # Minimal column check — grouping CSVs must have at least 2 columns
-      if (ncol(uploaded) < 2) {
-        stop("The uploaded file must have at least two columns.")
-      }
-
-      type_dir <- if (identical(input$data_type_selector, "Botanical")) {
-        "groupings/botanical_taxa"
-      } else {
-        "groupings/faunal_taxa"
-      }
-
-      if (!dir.exists(type_dir)) {
-        dir.create(type_dir, recursive = TRUE)
-      }
-
-      dest_name <- input$upload_group$name
-      dest_path <- file.path(type_dir, dest_name)
-      file.copy(input$upload_group$datapath, dest_path, overwrite = TRUE)
-
-      # Refresh the grouping selector
-      grouping_choices <- available_groupings(input$data_type_selector)
-      updateSelectInput(session, "file_selector_tx",
-                        choices = grouping_choices,
-                        selected = dest_path)
-
-      showNotification(
-        sprintf("Uploaded '%s' to %s.", dest_name, type_dir),
-        type = "message", duration = 4
-      )
-    }, error = function(error) {
-      showNotification(conditionMessage(error), type = "error", duration = 6)
-    })
-  }, ignoreInit = TRUE)
-
   # ── Group management: download ────────────────────────────────────────────────
   output$download_group <- downloadHandler(
     filename = function() {

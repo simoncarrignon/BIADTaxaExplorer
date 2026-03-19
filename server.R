@@ -278,4 +278,115 @@ server <- function(input, output, session) {
       utils::write.csv(result$combined_data, file, row.names = FALSE)
     }
   )
+
+  # ── Group management: upload ──────────────────────────────────────────────────
+  observeEvent(input$upload_group, {
+    req(input$upload_group$datapath)
+
+    tryCatch({
+      uploaded <- utils::read.csv(input$upload_group$datapath, header = TRUE,
+                                  stringsAsFactors = FALSE)
+
+      # Minimal column check — grouping CSVs must have at least 2 columns
+      if (ncol(uploaded) < 2) {
+        stop("The uploaded file must have at least two columns.")
+      }
+
+      type_dir <- if (identical(input$data_type_selector, "Botanical")) {
+        "groupings/botanical_taxa"
+      } else {
+        "groupings/faunal_taxa"
+      }
+
+      if (!dir.exists(type_dir)) {
+        dir.create(type_dir, recursive = TRUE)
+      }
+
+      dest_name <- input$upload_group$name
+      dest_path <- file.path(type_dir, dest_name)
+      file.copy(input$upload_group$datapath, dest_path, overwrite = TRUE)
+
+      # Refresh the grouping selector
+      grouping_choices <- available_groupings(input$data_type_selector)
+      updateSelectInput(session, "file_selector_tx",
+                        choices = grouping_choices,
+                        selected = dest_path)
+
+      showNotification(
+        sprintf("Uploaded '%s' to %s.", dest_name, type_dir),
+        type = "message", duration = 4
+      )
+    }, error = function(error) {
+      showNotification(conditionMessage(error), type = "error", duration = 6)
+    })
+  }, ignoreInit = TRUE)
+
+  # ── Group management: download ────────────────────────────────────────────────
+  output$download_group <- downloadHandler(
+    filename = function() {
+      if (is.null(input$file_selector_tx)) "group.csv" else basename(input$file_selector_tx)
+    },
+    content = function(file) {
+      path <- input$file_selector_tx
+      if (is.null(path) || !file.exists(path)) {
+        stop("No grouping file is currently selected or available.")
+      }
+      file.copy(path, file)
+    }
+  )
+
+  # ── Group management: edit modal ──────────────────────────────────────────────
+  observeEvent(input$edit_group, {
+    req(input$file_selector_tx)
+
+    path <- input$file_selector_tx
+    if (!file.exists(path)) {
+      showNotification("Grouping file not found.", type = "error", duration = 4)
+      return()
+    }
+
+    group_data <- utils::read.csv(path, header = TRUE, stringsAsFactors = FALSE)
+
+    showModal(modalDialog(
+      title = paste("Edit:", basename(path)),
+      size = "l",
+      DT::DTOutput("edit_group_table"),
+      footer = tagList(
+        actionButton("save_group_edits", "Save", class = "btn-primary"),
+        modalButton("Cancel")
+      )
+    ))
+
+    output$edit_group_table <- DT::renderDT({
+      DT::datatable(
+        group_data,
+        editable = list(target = "cell"),
+        rownames = FALSE,
+        options = list(scrollX = TRUE, pageLength = 20)
+      )
+    })
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$save_group_edits, {
+    req(input$edit_group_table_cell_edit)
+    req(input$file_selector_tx)
+
+    path <- input$file_selector_tx
+    if (!file.exists(path)) {
+      showNotification("Cannot save: grouping file not found.", type = "error", duration = 4)
+      return()
+    }
+
+    tryCatch({
+      group_data <- utils::read.csv(path, header = TRUE, stringsAsFactors = FALSE)
+      info <- input$edit_group_table_cell_edit
+      group_data[info$row, info$col + 1] <- DT::coerceValue(info$value, group_data[info$row, info$col + 1])
+      utils::write.csv(group_data, path, row.names = FALSE)
+
+      removeModal()
+      showNotification("Group file saved.", type = "message", duration = 3)
+    }, error = function(error) {
+      showNotification(conditionMessage(error), type = "error", duration = 6)
+    })
+  }, ignoreInit = TRUE)
 }

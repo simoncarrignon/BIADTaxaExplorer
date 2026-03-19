@@ -4,6 +4,7 @@ library(bslib)
 library(leaflet)
 library(leaflet.extras)
 library(geojsonsf)
+library(DT)
 
 devtools::load_all("../BIADconnect/")
 

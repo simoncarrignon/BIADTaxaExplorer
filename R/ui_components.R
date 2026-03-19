@@ -238,6 +238,15 @@ app_ui <- function() {
                     selected = "Faunal"
                   ),
                   selectInput("file_selector_tx", "Taxon grouping", choices = character(0)),
+                  div(
+                    class = "group-management-actions",
+                    fileInput("upload_group", "Upload new group (.csv)", accept = ".csv"),
+                    div(
+                      class = "group-management-buttons",
+                      downloadButton("download_group", "Download group CSV"),
+                      actionButton("edit_group", "Edit group labels", class = "btn-default")
+                    )
+                  ),
                   uiOutput("taxon_table")
                 ),
                 div(

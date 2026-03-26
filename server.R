@@ -59,6 +59,15 @@ server <- function(input, output, session) {
     dataset
   })
 
+  observeEvent(input$use_logs, {
+    if (isTRUE(input$use_logs)) {
+      showNotification(
+        "Log transformation on CA should only be used for purely exploratory purposes and not for final interpretation/publication.",
+        type = "warning", duration = 8
+      )
+    }
+  }, ignoreInit = TRUE)
+
   observe({
     input$data_type_selector
     input$file_selector_tx

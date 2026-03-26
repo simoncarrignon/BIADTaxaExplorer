@@ -136,15 +136,19 @@ server <- function(input, output, session) {
         addCircleMarkers(
           data = points,
           radius = 4,
-          stroke = FALSE,
+          stroke = TRUE,
+          weight = 1,
+          color = "#1f2937",
+          opacity = 0.8,
           fillOpacity = 0.9,
-          color = point_colors,
+          fillColor = point_colors,
           popup = site_popup_label(points),
           group = "sites"
         )
     }
 
     if (!is.null(polygons) && nrow(polygons) > 0) {
+      bbox <- sf::st_bbox(polygons)
       proxy |>
         addPolygons(
           data = polygons,
@@ -153,7 +157,8 @@ server <- function(input, output, session) {
           fillOpacity = 0.08,
           color = "#1f2937",
           weight = 2
-        )
+        ) |>
+        fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]])
     }
   })
 

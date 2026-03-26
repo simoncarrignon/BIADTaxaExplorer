@@ -259,6 +259,9 @@ app_ui <- function() {
                         ),
                         actionButton("edit_group", "✎ edit labels",
                           style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
+                        ),
+                        downloadButton("download_template", "↓ template",
+                          style = "font-size: 11px; padding: 2px 8px; height: auto; color: #888; background: #fff; border: 1px dashed #ccc;"
                         )
                       )
                     )

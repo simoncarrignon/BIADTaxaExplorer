@@ -284,8 +284,7 @@ server <- function(input, output, session) {
     req(input$upload_group$datapath)
 
     tryCatch({
-      uploaded <- utils::read.csv(input$upload_group$datapath, header = TRUE,
-                                  stringsAsFactors = FALSE)
+      uploaded <- utils::read.csv(input$upload_group$datapath, header = FALSE, fill = TRUE)
 
       # Minimal column check — grouping CSVs must have at least 2 columns
       if (ncol(uploaded) < 2) {
@@ -345,7 +344,8 @@ server <- function(input, output, session) {
       return()
     }
 
-    group_data <- utils::read.csv(path, header = TRUE, stringsAsFactors = FALSE)
+    group_data <- utils::read.csv(path, header = FALSE, fill = TRUE,
+                                    col.names = c("Group", "Label", "TaxaCodes"))
 
     showModal(modalDialog(
       title = paste("Edit:", basename(path)),
@@ -378,7 +378,8 @@ server <- function(input, output, session) {
     }
 
     tryCatch({
-      group_data <- utils::read.csv(path, header = TRUE, stringsAsFactors = FALSE)
+      group_data <- utils::read.csv(path, header = FALSE, fill = TRUE,
+                                      col.names = c("Group", "Label", "TaxaCodes"))
       info <- input$edit_group_table_cell_edit
       group_data[info$row, info$col + 1] <- DT::coerceValue(info$value, group_data[info$row, info$col + 1])
       utils::write.csv(group_data, path, row.names = FALSE)

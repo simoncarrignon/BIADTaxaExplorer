@@ -10,8 +10,7 @@ read_taxon_grouping <- function(filename) {
   grouping_data <- read.csv(
     filename,
     skip = 1,
-    header = FALSE,
-    stringsAsFactors = FALSE
+    header = FALSE
   )
   grouping_data <- grouping_data[!is.na(grouping_data[, 1]), , drop = FALSE]
 

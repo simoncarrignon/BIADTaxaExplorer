@@ -284,11 +284,10 @@ server <- function(input, output, session) {
     req(input$upload_group$datapath)
 
     tryCatch({
-      uploaded <- utils::read.csv(input$upload_group$datapath, header = FALSE, fill = TRUE)
-
-      # Minimal column check — grouping CSVs must have at least 2 columns
-      if (ncol(uploaded) < 2) {
-        stop("The uploaded file must have at least two columns.")
+      # Validate: must parse as a usable grouping file
+      grouping <- read_taxon_grouping(input$upload_group$datapath)
+      if (length(grouping) == 0) {
+        stop("No groups found. The file must have at least one row with a group number, label, and taxa codes separated by '+'.")
       }
 
       type_dir <- if (identical(input$data_type_selector, "Botanical")) {
@@ -301,7 +300,12 @@ server <- function(input, output, session) {
         dir.create(type_dir, recursive = TRUE)
       }
 
+      # Ensure filename starts with "group_" so it appears in the selector
       dest_name <- input$upload_group$name
+      if (!grepl("^group_", dest_name)) {
+        dest_name <- paste0("group_", dest_name)
+      }
+
       dest_path <- file.path(type_dir, dest_name)
       file.copy(input$upload_group$datapath, dest_path, overwrite = TRUE)
 
@@ -312,7 +316,7 @@ server <- function(input, output, session) {
                         selected = dest_path)
 
       showNotification(
-        sprintf("Uploaded '%s' to %s.", dest_name, type_dir),
+        sprintf("Uploaded '%s' — %d groups found.", dest_name, length(grouping)),
         type = "message", duration = 4
       )
     }, error = function(error) {

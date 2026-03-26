@@ -246,14 +246,8 @@ app_ui <- function() {
                     ),
                     div(
                       style = "margin-top: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;",
-                      fileInput("upload_group", NULL,
-                        accept = ".csv",
-                        buttonLabel = "Upload .csv",
-                        placeholder = "no file selected",
-                        width = "100%"
-                      ),
                       div(
-                        style = "display: flex; gap: 8px; margin-top: -10px;",
+                        style = "display: flex; gap: 8px;",
                         downloadButton("download_group", "↓ download",
                           style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
                         ),
@@ -266,7 +260,23 @@ app_ui <- function() {
                       )
                     )
                   ),
-                  uiOutput("taxon_table")
+                  uiOutput("taxon_table"),
+                  tags$details(
+                    style = "margin-top: 4px; font-size: 11px;",
+                    tags$summary(
+                      style = "color: #999; cursor: pointer; user-select: none;",
+                      "upload new grouping file"
+                    ),
+                    div(
+                      style = "margin-top: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;",
+                      fileInput("upload_group", NULL,
+                        accept = ".csv",
+                        buttonLabel = "Upload .csv",
+                        placeholder = "no file selected",
+                        width = "100%"
+                      )
+                    )
+                  )
                 ),
                 div(
                   class = "sidebar-subsection sidebar-action-surface",

@@ -334,6 +334,14 @@ server <- function(input, output, session) {
     }
   )
 
+  # ── Group management: download template ──────────────────────────────────────
+  output$download_template <- downloadHandler(
+    filename = function() "template_grouping.csv",
+    content = function(file) {
+      file.copy("groupings/template_grouping.csv", file)
+    }
+  )
+
   # ── Group management: edit modal ──────────────────────────────────────────────
   observeEvent(input$edit_group, {
     req(input$file_selector_tx)

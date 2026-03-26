@@ -352,8 +352,7 @@ server <- function(input, output, session) {
       return()
     }
 
-    group_data <- utils::read.csv(path, header = FALSE, fill = TRUE,
-                                    col.names = c("Group", "Label", "TaxaCodes"))
+    group_data <- utils::read.csv(path, header = FALSE, fill = TRUE)
 
     showModal(modalDialog(
       title = paste("Edit:", basename(path)),
@@ -386,8 +385,7 @@ server <- function(input, output, session) {
     }
 
     tryCatch({
-      group_data <- utils::read.csv(path, header = FALSE, fill = TRUE,
-                                      col.names = c("Group", "Label", "TaxaCodes"))
+      group_data <- utils::read.csv(path, header = FALSE, fill = TRUE)
       info <- input$edit_group_table_cell_edit
       group_data[info$row, info$col + 1] <- DT::coerceValue(info$value, group_data[info$row, info$col + 1])
       utils::write.csv(group_data, path, row.names = FALSE)

@@ -238,17 +238,17 @@ present_period_levels <- function(period_values, period_levels = NULL) {
   resolve_period_levels(period_values)
 }
 
-plotCAarrows <- function(ca_result, period_levels = NULL) {
+plotOrdinationArrows <- function(ordination_result, period_levels = NULL) {
   old_par <- par(no.readonly = TRUE)
   on.exit(par(old_par), add = TRUE)
 
   par(xpd = TRUE)  
-  row_coordinates <- as.matrix(ca_result$row$coord)
+  row_coordinates <- as.matrix(ordination_result$row_coordinates)
   if (is.null(colnames(row_coordinates))) {
     colnames(row_coordinates) <- paste('Dim', seq_len(ncol(row_coordinates)))
   }
   if (ncol(row_coordinates) < 2) {
-    empty_plot_message("At least two CA dimensions are needed for the CA map.")
+    empty_plot_message(sprintf("At least two dimensions are needed for the %s map.", tolower(ordination_result$method_label)))
     return(invisible(NULL))
   }
 
@@ -302,7 +302,7 @@ plotCAarrows <- function(ca_result, period_levels = NULL) {
     }
   }
 
-  column_coordinates <- as.matrix(ca_result$col$coord)
+  column_coordinates <- as.matrix(ordination_result$column_coordinates)
   if (!is.null(column_coordinates) && ncol(column_coordinates) >= 2) {
     text(
       column_coordinates[, 1],
@@ -324,13 +324,13 @@ plotCAarrows <- function(ca_result, period_levels = NULL) {
   )
 }
 
-plot2dim <- function(ca_result, period_levels = NULL) {
-  row_coordinates <- as.matrix(ca_result$row$coord)
+plotOrdinationDimensions <- function(ordination_result, period_levels = NULL) {
+  row_coordinates <- as.matrix(ordination_result$row_coordinates)
   if (is.null(dim(row_coordinates))) {
     row_coordinates <- matrix(
       row_coordinates,
       ncol = 1,
-      dimnames = list(names(ca_result$row$coord), "Dim 1")
+      dimnames = list(names(ordination_result$row_coordinates), "Dim 1")
     )
   }
   if (is.null(colnames(row_coordinates))) {
@@ -402,4 +402,43 @@ plot2dim <- function(ca_result, period_levels = NULL) {
       bty = "n"
     )
   }
+}
+
+plotOrdinationDiagnostics <- function(ordination_result, max_dimensions = 10) {
+  eig <- ordination_result$eigenvalues
+  if (is.null(eig) || !nrow(eig)) {
+    empty_plot_message("No ordination diagnostics are available.")
+    return(invisible(NULL))
+  }
+
+  dimension_count <- min(nrow(eig), max_dimensions)
+  percentages <- eig[seq_len(dimension_count), 2]
+  dimension_labels <- paste("Dim", seq_len(dimension_count))
+  y_max <- max(percentages, na.rm = TRUE)
+  if (!is.finite(y_max) || y_max <= 0) {
+    y_max <- 1
+  }
+
+  old_par <- par(no.readonly = TRUE)
+  on.exit(par(old_par), add = TRUE)
+
+  par(mar = c(6, 4, 3, 1))
+  mids <- barplot(
+    percentages,
+    names.arg = dimension_labels,
+    las = 2,
+    ylab = ordination_result$diagnostic_label,
+    main = sprintf("%s diagnostics", ordination_result$method_label),
+    ylim = c(0, y_max * 1.15),
+    col = "#9ecae1",
+    border = "#4b5563"
+  )
+
+  text(
+    x = mids,
+    y = percentages,
+    labels = sprintf("%.1f%%", percentages),
+    pos = 3,
+    cex = 0.85
+  )
 }

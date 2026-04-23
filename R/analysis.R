@@ -127,7 +127,25 @@ prepare_analysis_data <- function(dataset, polygons) {
   prepared
 }
 
-build_count_matrix <- function(subregions, count_column, use_logs = FALSE) {
+analysis_method_label <- function(analysis_method) {
+  switch(
+    analysis_method,
+    "ca" = "Correspondence analysis",
+    "pca" = "Principal component analysis",
+    stop("Unknown analysis method selected.")
+  )
+}
+
+ordination_diagnostic_label <- function(analysis_method) {
+  switch(
+    analysis_method,
+    "ca" = "Percent inertia explained",
+    "pca" = "Percent variance explained",
+    stop("Unknown analysis method selected.")
+  )
+}
+
+build_count_matrix <- function(subregions, count_column) {
   counts <- tapply(
     subregions[[count_column]],
     list(subregions$phase, subregions$new_txgroups),
@@ -155,15 +173,77 @@ build_count_matrix <- function(subregions, count_column, use_logs = FALSE) {
   }
 
   if (nrow(counts) < 2 || ncol(counts) < 2) {
-    stop("Correspondence analysis needs at least two populated phase/area combinations and two populated taxon groups.")
-  }
-
-  if (use_logs) {
-    counts <- log(counts + 1)
-    notes <- c(notes, "A log(count + 1) transform was applied before correspondence analysis.")
+    stop("Ordination needs at least two populated phase/area combinations and two populated taxon groups.")
   }
 
   list(counts = counts, notes = notes)
+}
+
+run_ordination <- function(count_matrix, analysis_method, use_logs = FALSE, pca_transform = "log1p") {
+  notes <- character(0)
+  ordination_matrix <- count_matrix
+
+  if (identical(analysis_method, "ca")) {
+    if (isTRUE(use_logs)) {
+      ordination_matrix <- log(ordination_matrix + 1)
+      notes <- c(notes, "A log(count + 1) transform was applied before correspondence analysis.")
+    }
+
+    model <- FactoMineR::CA(ordination_matrix, graph = FALSE)
+    return(list(
+      method = analysis_method,
+      method_label = analysis_method_label(analysis_method),
+      diagnostic_label = ordination_diagnostic_label(analysis_method),
+      matrix = ordination_matrix,
+      row_coordinates = as.matrix(model$row$coord),
+      column_coordinates = as.matrix(model$col$coord),
+      eigenvalues = model$eig,
+      notes = notes
+    ))
+  }
+
+  if (!identical(analysis_method, "pca")) {
+    stop("Unknown analysis method selected.")
+  }
+
+  if (identical(pca_transform, "log1p")) {
+    ordination_matrix <- log(ordination_matrix + 1)
+    notes <- c(notes, "PCA used log(count + 1) transformed counts.")
+  } else if (identical(pca_transform, "raw")) {
+    notes <- c(notes, "PCA used raw counts.")
+  } else {
+    stop("Unknown PCA input transform selected.")
+  }
+
+  column_variance <- apply(ordination_matrix, 2, stats::var, na.rm = TRUE)
+  zero_variance_columns <- !is.finite(column_variance) | column_variance == 0
+  if (any(zero_variance_columns)) {
+    ordination_matrix <- ordination_matrix[, !zero_variance_columns, drop = FALSE]
+    notes <- c(notes, sprintf("%s taxon groups with zero variance were removed before PCA.", sum(zero_variance_columns)))
+  }
+
+  if (nrow(ordination_matrix) < 2 || ncol(ordination_matrix) < 2) {
+    stop("PCA needs at least two populated phase/area combinations and two taxon groups with non-zero variance.")
+  }
+
+  model <- FactoMineR::PCA(
+    as.data.frame(ordination_matrix),
+    scale.unit = TRUE,
+    ncp = min(5, nrow(ordination_matrix) - 1L, ncol(ordination_matrix)),
+    graph = FALSE
+  )
+  notes <- c(notes, "PCA is run on centered and scaled taxon-group columns after the selected transform.")
+
+  list(
+    method = analysis_method,
+    method_label = analysis_method_label(analysis_method),
+    diagnostic_label = ordination_diagnostic_label(analysis_method),
+    matrix = ordination_matrix,
+    row_coordinates = as.matrix(model$ind$coord),
+    column_coordinates = as.matrix(model$var$coord),
+    eigenvalues = model$eig,
+    notes = notes
+  )
 }
 
 build_combined_data <- function(count_matrix, row_coordinates) {
@@ -259,7 +339,7 @@ build_phase_assignment_data <- function(subregions) {
   phase_frame
 }
 
-compute_analysis <- function(dataset, polygons, data_type, use_logs = FALSE) {
+compute_analysis <- function(dataset, polygons, data_type, analysis_method = "ca", use_logs = FALSE, pca_transform = "log1p") {
   normalized_polygons <- normalize_polygon_data(polygons, dataset)
   selected_polygon_count <- if (is.null(normalized_polygons)) 0 else nrow(normalized_polygons)
   count_column <- count_column_for_type(data_type)
@@ -269,9 +349,15 @@ compute_analysis <- function(dataset, polygons, data_type, use_logs = FALSE) {
   }
 
   subregions <- prepare_analysis_data(dataset, normalized_polygons)
-  count_bundle <- build_count_matrix(subregions, count_column, use_logs)
+  count_bundle <- build_count_matrix(subregions, count_column)
+  ordination_bundle <- run_ordination(
+    count_matrix = count_bundle$counts,
+    analysis_method = analysis_method,
+    use_logs = use_logs,
+    pca_transform = pca_transform
+  )
   used_polygon_count <- length(unique(subregions$new_area))
-  notes <- c(count_bundle$notes, dataset_notes)
+  notes <- c(count_bundle$notes, dataset_notes, ordination_bundle$notes)
 
   if (identical(data_type, "Combined")) {
     notes <- c(notes, "Combined mode merges faunal NISP and botanical counts into the same matrix.")
@@ -287,21 +373,20 @@ compute_analysis <- function(dataset, polygons, data_type, use_logs = FALSE) {
     )
   }
 
-  ca_result <- FactoMineR::CA(count_bundle$counts, graph = FALSE)
-
   list(
     subregions = subregions,
-    count_matrix = count_bundle$counts,
-    ca = ca_result,
+    count_matrix = ordination_bundle$matrix,
+    ordination = ordination_bundle,
     phase_assignments = build_phase_assignment_data(subregions),
-    combined_data = build_combined_data(count_bundle$counts, ca_result$row$coord),
+    combined_data = build_combined_data(ordination_bundle$matrix, ordination_bundle$row_coordinates),
     count_column = count_column,
     period_levels = resolve_period_levels(subregions$new_periods),
     summary = list(
       records = nrow(subregions),
-      phase_count = nrow(count_bundle$counts),
+      phase_count = nrow(ordination_bundle$matrix),
       polygon_count = used_polygon_count,
-      taxon_group_count = ncol(count_bundle$counts)
+      taxon_group_count = ncol(ordination_bundle$matrix),
+      analysis_method = ordination_bundle$method_label
     ),
     notes = notes
   )

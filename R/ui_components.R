@@ -135,7 +135,7 @@ build_analysis_status_ui <- function(result, stale) {
         status_pill("No analysis has been run yet.", "neutral"),
         tags$p(
           class = "helper-text",
-          "Choose a dataset, define polygons, and click Run analysis to compute the correspondence analysis."
+          "Choose a dataset, define polygons, select an analysis type, and click Run analysis to compute the ordination."
         )
       )
     )
@@ -148,6 +148,7 @@ build_analysis_status_ui <- function(result, stale) {
   }
 
   metrics <- metrics_grid(
+    metric_chip("Method", result$summary$analysis_method),
     metric_chip("Used polygons", result$summary$polygon_count),
     metric_chip("Phases", result$summary$phase_count),
     metric_chip("Taxon groups", result$summary$taxon_group_count),
@@ -208,7 +209,7 @@ app_ui <- function() {
             class = "hero-copy",
             tags$h1("BIAD Taxa Explorer"),
             tags$p(
-              "Select a dataset, define study areas, group taxa, and compare spatial-temporal patterns with correspondence analysis."
+              "Select a dataset, define study areas, group taxa, and compare spatial-temporal patterns with correspondence analysis or principal component analysis."
             ),
             div(
               class = "warning-banner",
@@ -372,16 +373,56 @@ app_ui <- function() {
                       )
                     )
                   )
-                ),
+                )
+              ),
+              section_card(
+                title = "Type of analysis",
+                subtitle = "Choose the ordination method and, for PCA, the input transform and scaling.",
+                step = "Step 3",
+                class_name = "sidebar-card",
                 div(
-                  class = "sidebar-option-row",
-                  checkboxInput("use_logs", "Apply log(count + 1) before CA", FALSE)
+                  class = "sidebar-subsection",
+                  selectInput(
+                    "analysis_method",
+                    "Ordination method",
+                    choices = c(
+                      "Correspondence analysis" = "ca",
+                      "Principal component analysis" = "pca"
+                    ),
+                    selected = "ca"
+                  )
+                ),
+                conditionalPanel(
+                  condition = "input.analysis_method == 'ca'",
+                  div(
+                    class = "sidebar-option-row",
+                    checkboxInput("use_logs", "Apply log(count + 1) before CA", FALSE)
+                  )
+                ),
+                conditionalPanel(
+                  condition = "input.analysis_method == 'pca'",
+                  div(
+                    class = "sidebar-subsection sidebar-time-surface",
+                    selectInput(
+                      "pca_transform",
+                      "PCA input matrix",
+                      choices = c(
+                        "log(count + 1)" = "log1p",
+                        "Raw counts" = "raw"
+                      ),
+                      selected = "log1p"
+                    ),
+                    tags$p(
+                      class = "sidebar-subsection-help",
+                      "The selected transform is applied first, then PCA uses centered and scaled taxon-group columns."
+                    )
+                  )
                 )
               ),
               section_card(
                 title = "Run and export",
                 subtitle = "Analysis only reruns when you ask for it, so the interface stays responsive.",
-                step = "Step 3",
+                step = "Step 4",
                 class_name = "sidebar-card sidebar-actions-card",
                 div(
                   class = "control-actions",
@@ -469,10 +510,10 @@ app_ui <- function() {
                     plotOutput("plot2_culture", height = "420px")
                   ),
                   tabPanel(
-                    "CA map",
+                    "Ordination map",
                     tags$p(
                       class = "plot-caption",
-                      "Correspondence analysis with arrows that track phase order inside each polygon."
+                      "Ordination map with arrows that track phase order inside each polygon."
                     ),
                     plotOutput("plot3", height = "520px")
                   ),
@@ -480,9 +521,14 @@ app_ui <- function() {
                     "Dimensions",
                     tags$p(
                       class = "plot-caption",
-                      "How the first two CA dimensions evolve across time for each polygon."
+                      "How the first two ordination dimensions evolve across time for each polygon."
                     ),
-                    plotOutput("plot4", height = "520px")
+                    plotOutput("plot4", height = "520px"),
+                    tags$p(
+                      class = "plot-caption",
+                      "Diagnostic view of variance explained for PCA or inertia explained for CA."
+                    ),
+                    plotOutput("plot4_diag", height = "280px")
                   ),
                   tabPanel(
                     "Data preview",

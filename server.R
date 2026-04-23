@@ -154,7 +154,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$use_logs, {
-    if (isTRUE(input$use_logs)) {
+    if (isTRUE(input$use_logs) && identical(input$analysis_method, "ca")) {
       showNotification(
         "Log transformation on CA should only be used for purely exploratory purposes and not for final interpretation/publication.",
         type = "warning", duration = 8
@@ -171,6 +171,8 @@ server <- function(input, output, session) {
     input$start_value
     input$end_value
     input$duration
+    input$analysis_method
+    input$pca_transform
     input$use_logs
     current_polygons()
 
@@ -313,17 +315,19 @@ server <- function(input, output, session) {
 
   observeEvent(input$run_btn, {
     tryCatch({
-      result <- withProgress(message = "Running correspondence analysis", value = 0, {
+      result <- withProgress(message = "Running ordination analysis", value = 0, {
         incProgress(0.25, detail = "Preparing grouped records")
         dataset <- prepared_dataset()
         polygons <- current_polygons()
 
-        incProgress(0.45, detail = "Aggregating counts and fitting CA")
+        incProgress(0.45, detail = "Aggregating counts and fitting the selected method")
         result <- compute_analysis(
           dataset = dataset,
           polygons = polygons,
           data_type = input$data_type_selector,
-          use_logs = input$use_logs
+          analysis_method = input$analysis_method,
+          use_logs = input$use_logs,
+          pca_transform = input$pca_transform
         )
 
         incProgress(0.30, detail = "Packaging plots and exports")
@@ -363,14 +367,20 @@ server <- function(input, output, session) {
 
   output$plot3 <- renderPlot({
     result <- analysis_result()
-    shiny::validate(shiny::need(!is.null(result), "Run analysis to view the CA map."))
-    plotCAarrows(result$ca, period_levels = result$period_levels)
+    shiny::validate(shiny::need(!is.null(result), "Run analysis to view the ordination map."))
+    plotOrdinationArrows(result$ordination, period_levels = result$period_levels)
   })
 
   output$plot4 <- renderPlot({
     result <- analysis_result()
-    shiny::validate(shiny::need(!is.null(result), "Run analysis to view CA dimensions."))
-    plot2dim(result$ca, period_levels = result$period_levels)
+    shiny::validate(shiny::need(!is.null(result), "Run analysis to view ordination dimensions."))
+    plotOrdinationDimensions(result$ordination, period_levels = result$period_levels)
+  })
+
+  output$plot4_diag <- renderPlot({
+    result <- analysis_result()
+    shiny::validate(shiny::need(!is.null(result), "Run analysis to view ordination diagnostics."))
+    plotOrdinationDiagnostics(result$ordination)
   })
 
   output$analysis_preview <- renderTable({

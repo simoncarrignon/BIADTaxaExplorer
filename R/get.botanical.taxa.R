@@ -8,7 +8,7 @@ getABotTaxa <- function(crs=4326,conn=NULL){
             a.TotalCount,
             p.PhaseId,
             p.Period,
-            p.Culture1,
+            p.Culture1 AS Culture,
             p.GMM,
             p.GMS,
             s.SiteId,
@@ -27,4 +27,3 @@ getABotTaxa <- function(crs=4326,conn=NULL){
      st_crs(alltaxons) = crs 
      return(alltaxons)
 }
-

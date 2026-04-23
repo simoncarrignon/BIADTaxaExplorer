@@ -293,6 +293,20 @@ server <- function(input, output, session) {
     }
   )
 
+  output$download_raw_table <- downloadHandler(
+    filename = function() {
+      sprintf("raw_phase_assignments_%s_taxa.csv", tolower(input$data_type_selector))
+    },
+    content = function(file) {
+      result <- analysis_result()
+      if (is.null(result)) {
+        stop("Run the analysis before downloading phase assignments.")
+      }
+
+      utils::write.csv(result$phase_assignments, file, row.names = FALSE)
+    }
+  )
+
   # ── Group management: upload ──────────────────────────────────────────────────
   observeEvent(input$upload_group, {
     req(input$upload_group$datapath)

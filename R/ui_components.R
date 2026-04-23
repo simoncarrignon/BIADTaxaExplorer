@@ -380,7 +380,7 @@ app_ui <- function() {
                     tags$div(class = "sidebar-subsection-title", "Export"),
                     tags$p(
                       class = "sidebar-subsection-help",
-                      "Download the current study polygons or the aggregated results table."
+                      "Download the current study polygons, a phase-level table before region/time aggregation, or the aggregated results table."
                     ),
                     div(
                       class = "export-actions",
@@ -390,8 +390,13 @@ app_ui <- function() {
                         class = "btn-default btn-block sidebar-download-btn"
                       ),
                       downloadButton(
+                        "download_raw_table",
+                        "Download raw phases",
+                        class = "btn-default btn-block sidebar-download-btn"
+                      ),
+                      downloadButton(
                         "download_table",
-                        "Download results",
+                        "Download aggregated results",
                         class = "btn-default btn-block sidebar-download-btn"
                       )
                     )

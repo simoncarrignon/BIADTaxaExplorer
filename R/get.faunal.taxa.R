@@ -8,7 +8,7 @@ getFaunalTaxa <- function(crs=4326,conn=NULL){
             f.TaxonCode,
             p.PhaseId,
             p.Period,
-            p.Culture1,
+            p.Culture1 AS Culture,
             p.GMM,
             p.GMS,
             s.SiteId,
@@ -27,4 +27,3 @@ getFaunalTaxa <- function(crs=4326,conn=NULL){
      st_crs(alltaxons) = crs 
      return(alltaxons)
 }
-

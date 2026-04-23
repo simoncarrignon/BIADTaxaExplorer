@@ -188,6 +188,77 @@ build_combined_data <- function(count_matrix, row_coordinates) {
   )
 }
 
+build_phase_assignment_data <- function(subregions) {
+  coordinates <- sf::st_coordinates(sf::st_transform(subregions, 4326))
+  phase_frame <- cbind(
+    sf::st_drop_geometry(subregions),
+    Longitude = coordinates[, "X"],
+    Latitude = coordinates[, "Y"]
+  )
+  culture_column <- intersect(c("Culture", "Culture1"), names(phase_frame))
+  selected_columns <- intersect(
+    c(
+      "SiteId",
+      "SiteName",
+      "Country",
+      "Longitude",
+      "Latitude",
+      "PhaseId",
+      "Period",
+      "GMM",
+      "GMS",
+      "new_area",
+      "new_periods",
+      "phase"
+    ),
+    names(phase_frame)
+  )
+  selected_columns <- c(selected_columns, culture_column[1])
+  selected_columns <- unique(selected_columns)
+
+  phase_frame <- unique(phase_frame[, selected_columns, drop = FALSE])
+  column_labels <- c(
+    SiteId = "Site ID",
+    SiteName = "Site name",
+    Country = "Country",
+    Longitude = "Longitude",
+    Latitude = "Latitude",
+    PhaseId = "Phase ID",
+    Period = "Original period",
+    Culture = "Culture",
+    Culture1 = "Culture",
+    GMM = "Raw time (GMM)",
+    GMS = "Raw time uncertainty (GMS)",
+    new_area = "Polygon ID",
+    new_periods = "Time bin",
+    phase = "Grouped phase"
+  )
+  names(phase_frame) <- unname(column_labels[names(phase_frame)])
+
+  if ("Time bin" %in% names(phase_frame)) {
+    phase_frame[["Time bin"]] <- as.character(phase_frame[["Time bin"]])
+  }
+  if ("Grouped phase" %in% names(phase_frame)) {
+    phase_frame[["Grouped phase"]] <- as.character(phase_frame[["Grouped phase"]])
+  }
+
+  ordering_columns <- intersect(
+    c("Polygon ID", "Raw time (GMM)", "Site ID", "Phase ID"),
+    names(phase_frame)
+  )
+
+  if (length(ordering_columns)) {
+    ordering_frame <- phase_frame[, ordering_columns, drop = FALSE]
+    if ("Raw time (GMM)" %in% names(ordering_frame) && is.numeric(ordering_frame[["Raw time (GMM)"]])) {
+      ordering_frame[["Raw time (GMM)"]] <- -ordering_frame[["Raw time (GMM)"]]
+    }
+    phase_frame <- phase_frame[do.call(order, ordering_frame), , drop = FALSE]
+  }
+
+  rownames(phase_frame) <- NULL
+  phase_frame
+}
+
 compute_analysis <- function(dataset, polygons, data_type, use_logs = FALSE) {
   normalized_polygons <- normalize_polygon_data(polygons, dataset)
   selected_polygon_count <- if (is.null(normalized_polygons)) 0 else nrow(normalized_polygons)
@@ -214,6 +285,7 @@ compute_analysis <- function(dataset, polygons, data_type, use_logs = FALSE) {
     subregions = subregions,
     count_matrix = count_bundle$counts,
     ca = ca_result,
+    phase_assignments = build_phase_assignment_data(subregions),
     combined_data = build_combined_data(count_bundle$counts, ca_result$row$coord),
     count_column = count_column,
     period_levels = resolve_period_levels(subregions$new_periods),

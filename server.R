@@ -243,7 +243,7 @@ server <- function(input, output, session) {
       fit_map_to_data(points = selected_sites()) |>
       addDrawToolbar(
         targetGroup = "selected-polygons",
-        polygonOptions = drawPolygonOptions(showArea = TRUE),
+        polygonOptions = drawPolygonOptions(showArea = FALSE),
         editOptions = editToolbarOptions(edit = FALSE, remove = FALSE),
         polylineOptions = FALSE,
         rectangleOptions = FALSE,
@@ -361,6 +361,20 @@ server <- function(input, output, session) {
 
   observeEvent(input$clear_polygons_btn, {
     current_polygons(NULL)
+    leafletProxy("map") |>
+      clearGroup("selected-polygons") |>
+      clearShapes() |>
+      removeDrawToolbar(clearFeatures = TRUE) |>
+      addDrawToolbar(
+        targetGroup = "selected-polygons",
+        polygonOptions = drawPolygonOptions(showArea = FALSE),
+        editOptions = editToolbarOptions(edit = FALSE, remove = FALSE),
+        polylineOptions = FALSE,
+        rectangleOptions = FALSE,
+        circleOptions = FALSE,
+        markerOptions = FALSE,
+        circleMarkerOptions = FALSE
+      )
     showNotification("Polygons cleared.", type = "message", duration = 2)
   }, ignoreInit = TRUE)
 

@@ -141,6 +141,14 @@ format_grouping_label <- function(path) {
   gsub("_", " ", label)
 }
 
+is_valid_grouping_file <- function(path) {
+  tryCatch({
+    length(read_taxon_grouping(path)) > 0
+  }, error = function(error) {
+    FALSE
+  })
+}
+
 available_groupings <- function(data_type = "Faunal") {
   directory <- if (identical(data_type, "Botanical")) {
     "groupings/botanical_taxa"
@@ -151,10 +159,12 @@ available_groupings <- function(data_type = "Faunal") {
   files <- sort(
     list.files(
       directory,
-      pattern = "^group_.*\\.csv$",
+      pattern = "\\.csv$",
+      ignore.case = TRUE,
       full.names = TRUE
     )
   )
+  files <- files[vapply(files, is_valid_grouping_file, logical(1))]
 
   stats::setNames(files, vapply(files, format_grouping_label, character(1)))
 }

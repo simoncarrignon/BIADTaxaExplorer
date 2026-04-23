@@ -551,11 +551,7 @@ server <- function(input, output, session) {
         dir.create(type_dir, recursive = TRUE)
       }
 
-      # Ensure filename starts with "group_" so it appears in the selector
       dest_name <- input$upload_group$name
-      if (!grepl("^group_", dest_name)) {
-        dest_name <- paste0("group_", dest_name)
-      }
 
       dest_path <- file.path(type_dir, dest_name)
       file.copy(input$upload_group$datapath, dest_path, overwrite = TRUE)

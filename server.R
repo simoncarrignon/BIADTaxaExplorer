@@ -207,6 +207,34 @@ server <- function(input, output, session) {
     build_analysis_status_ui(analysis_result(), analysis_stale())
   })
 
+  output$map_exports <- renderUI({
+    if (is.null(analysis_result())) {
+      return(NULL)
+    }
+
+    div(
+      class = "map-export-bar",
+      div(
+        class = "map-export-actions",
+        downloadButton(
+          "download_polygons",
+          "Download polygons",
+          class = "btn-default map-download-btn"
+        ),
+        downloadButton(
+          "download_raw_table",
+          "Download raw phases",
+          class = "btn-default map-download-btn"
+        ),
+        downloadButton(
+          "download_table",
+          "Download aggregated results",
+          class = "btn-default map-download-btn"
+        )
+      )
+    )
+  })
+
   output$map <- renderLeaflet({
     leaflet() |>
       addTiles() |>

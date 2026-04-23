@@ -1,9 +1,16 @@
-section_card <- function(title, subtitle = NULL, ..., step = NULL, class_name = NULL) {
+section_card <- function(title, subtitle = NULL, ..., step = NULL, class_name = NULL, header_right = NULL) {
   div(
     class = paste("card", class_name),
     if (!is.null(step)) div(class = "step-label", step),
-    tags$h3(class = "card-title", title),
-    if (!is.null(subtitle)) tags$p(class = "helper-text", subtitle),
+    div(
+      class = "card-header-row",
+      div(
+        class = "card-header-main",
+        tags$h3(class = "card-title", title),
+        if (!is.null(subtitle)) tags$p(class = "helper-text", subtitle)
+      ),
+      if (!is.null(header_right)) div(class = "card-header-actions", header_right)
+    ),
     ...
   )
 }
@@ -423,7 +430,7 @@ app_ui <- function() {
                 )
               ),
               section_card(
-                title = "Run and export",
+                title = "Run analysis",
                 subtitle = "Analysis only reruns when you ask for it, so the interface stays responsive.",
                 step = "Step 4",
                 class_name = "sidebar-card sidebar-actions-card",
@@ -441,32 +448,6 @@ app_ui <- function() {
                       "Run analysis",
                       class = "btn-primary btn-lg btn-block sidebar-primary-btn"
                     )
-                  ),
-                  div(
-                    class = "sidebar-subsection sidebar-export-surface",
-                    tags$div(class = "sidebar-subsection-title", "Export"),
-                    tags$p(
-                      class = "sidebar-subsection-help",
-                      "Download the current study polygons, a phase-level table before region/time aggregation, or the aggregated results table."
-                    ),
-                    div(
-                      class = "export-actions",
-                      downloadButton(
-                        "download_polygons",
-                        "Download polygons",
-                        class = "btn-default btn-block sidebar-download-btn"
-                      ),
-                      downloadButton(
-                        "download_raw_table",
-                        "Download raw phases",
-                        class = "btn-default btn-block sidebar-download-btn"
-                      ),
-                      downloadButton(
-                        "download_table",
-                        "Download aggregated results",
-                        class = "btn-default btn-block sidebar-download-btn"
-                      )
-                    )
                   )
                 )
               )
@@ -480,6 +461,7 @@ app_ui <- function() {
             section_card(
               title = "Map and coverage",
               subtitle = "Draw one or more polygons directly on the map or upload a GeoPackage.",
+              header_right = uiOutput("map_exports"),
               uiOutput("selection_summary"),
               leafletOutput("map", height = "62vh")
             ),

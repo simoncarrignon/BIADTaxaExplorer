@@ -3,6 +3,12 @@ empty_plot_message <- function(message) {
   text(0.5, 0.5, message, cex = 1.05)
 }
 
+taxon_group_palette <- function(group_names) {
+  group_names <- sort(unique(as.character(group_names)))
+  colors <- palette.colors(max(length(group_names), 1), "Pastel 2", recycle = TRUE)
+  stats::setNames(colors[seq_along(group_names)], group_names)
+}
+
 countTotal <- function(dataset, count_column) {
   counts <- tapply(
     dataset[[count_column]],
@@ -65,19 +71,23 @@ countTotal <- function(dataset, count_column) {
 
 bySpeciesComposition <- function(dataset, count_column) {
   area_ids <- sort(unique(na.omit(dataset$new_area)))
+  all_groups <- sort(unique(as.character(stats::na.omit(dataset$new_txgroups))))
 
-  if (length(area_ids) == 0) {
+  if (length(area_ids) == 0 || !length(all_groups)) {
     empty_plot_message("No selected areas contain grouped data.")
     return(invisible(NULL))
   }
+
+  group_colors <- taxon_group_palette(all_groups)
 
   old_par <- par(no.readonly = TRUE)
   on.exit(par(old_par), add = TRUE)
 
   par(
     mfrow = c(1, length(area_ids)),
-    oma = c(2, 0, 0, 0),
-    mar = c(8, 4, 3, 1)
+    oma = c(2, 0, 0, 5),
+    mar = c(8, 4, 3, 1),
+    xpd = NA
   )
 
   for (area_index in seq_along(area_ids)) {
@@ -100,11 +110,10 @@ bySpeciesComposition <- function(dataset, count_column) {
 
     proportions <- sweep(composition, 2, colSums(composition), FUN = "/")
     proportions[is.na(proportions)] <- 0
-    group_colors <- palette.colors(max(nrow(proportions), 1), "Pastel 2", recycle = TRUE)
 
     barplot(
       proportions,
-      col = group_colors[seq_len(nrow(proportions))],
+      col = unname(group_colors[rownames(proportions)]),
       main = paste("Area", area_id),
       names.arg = colnames(proportions),
       las = 2,
@@ -115,10 +124,12 @@ bySpeciesComposition <- function(dataset, count_column) {
     if (area_index == length(area_ids)) {
       legend(
         "topright",
-        legend = rownames(proportions),
-        fill = group_colors[seq_len(nrow(proportions))],
+        legend = names(group_colors),
+        fill = unname(group_colors),
         bg = "white",
-        cex = 0.8
+        cex = 0.8,
+        bty = "n",
+        inset = c(-0.2, 0)
       )
     }
   }
@@ -160,7 +171,7 @@ byCultureComposition <- function(dataset, count_column) {
 
   proportions <- sweep(composition, 2, colSums(composition), FUN = "/")
   proportions[is.na(proportions)] <- 0
-  group_colors <- palette.colors(max(nrow(proportions), 1), "Pastel 2", recycle = TRUE)
+  group_colors <- taxon_group_palette(rownames(proportions))
 
   old_par <- par(no.readonly = TRUE)
   on.exit(par(old_par), add = TRUE)
@@ -168,7 +179,7 @@ byCultureComposition <- function(dataset, count_column) {
   par(mar = c(9, 4, 4, 1), xpd = TRUE)
   barplot(
     proportions,
-    col = group_colors[seq_len(nrow(proportions))],
+    col = unname(group_colors[rownames(proportions)]),
     las = 2,
     ylab = "Share of counts",
     main = "Taxon composition by culture",
@@ -177,8 +188,8 @@ byCultureComposition <- function(dataset, count_column) {
 
   legend(
     "topright",
-    legend = rownames(proportions),
-    fill = group_colors[seq_len(nrow(proportions))],
+    legend = names(group_colors),
+    fill = unname(group_colors),
     bg = "white",
     cex = 0.8,
     bty = "n",

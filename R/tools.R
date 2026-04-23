@@ -300,6 +300,13 @@ standardize_taxa_dataset <- function(dataset, count_column, source_label) {
   } else {
     rep(NA_character_, nrow(dataset))
   }
+  source_record_id <- if ("FaunalSpeciesID" %in% names(dataset)) {
+    paste("Faunal", as.character(dataset$FaunalSpeciesID), sep = ":")
+  } else if ("SampleID" %in% names(dataset)) {
+    paste("Botanical", as.character(dataset$SampleID), sep = ":")
+  } else {
+    paste(source_label, seq_len(nrow(dataset)), sep = ":")
+  }
   group_values <- if ("new_txgroups" %in% names(dataset)) {
     as.character(dataset$new_txgroups)
   } else {
@@ -318,6 +325,7 @@ standardize_taxa_dataset <- function(dataset, count_column, source_label) {
       SiteName = as.character(dataset$SiteName),
       Country = as.character(dataset$Country),
       Dataset = source_label,
+      SourceRecordId = source_record_id,
       Count = dataset[[count_column]],
       new_txgroups = group_values,
       stringsAsFactors = FALSE,

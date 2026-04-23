@@ -299,7 +299,84 @@ build_combined_data <- function(count_matrix, row_coordinates) {
   )
 }
 
-build_phase_assignment_data <- function(subregions) {
+phase_assignment_key <- function(dataset) {
+  key_columns <- intersect(
+    c("SiteId", "PhaseId", "new_area", "new_periods", "phase"),
+    names(dataset)
+  )
+
+  if (!length(key_columns)) {
+    stop("Phase assignment export needs site/phase identifiers.")
+  }
+
+  do.call(
+    paste,
+    c(
+      lapply(dataset[key_columns], function(column_values) {
+        ifelse(is.na(column_values), "", as.character(column_values))
+      }),
+      sep = "||"
+    )
+  )
+}
+
+build_phase_assignment_taxon_counts <- function(subregions, count_column, phase_ids) {
+  phase_frame <- sf::st_drop_geometry(subregions)
+  taxon_columns <- as.character(phase_frame$TaxonCode)
+  if ("Dataset" %in% names(phase_frame)) {
+    taxon_columns <- paste(as.character(phase_frame$Dataset), taxon_columns, sep = ": ")
+  }
+
+  source_record_ids <- if ("SourceRecordId" %in% names(phase_frame)) {
+    as.character(phase_frame$SourceRecordId)
+  } else if ("FaunalSpeciesID" %in% names(phase_frame)) {
+    paste("Faunal", as.character(phase_frame$FaunalSpeciesID), sep = ":")
+  } else if ("SampleID" %in% names(phase_frame)) {
+    paste("Botanical", as.character(phase_frame$SampleID), sep = ":")
+  } else {
+    paste("row", seq_len(nrow(phase_frame)), sep = ":")
+  }
+
+  count_frame <- unique(
+    data.frame(
+      phase_id = phase_assignment_key(phase_frame),
+      taxon_column = taxon_columns,
+      source_record_id = source_record_ids,
+      count_value = phase_frame[[count_column]],
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
+  )
+
+  if (!nrow(count_frame)) {
+    return(data.frame(row.names = seq_along(phase_ids)))
+  }
+
+  aggregated_counts <- stats::aggregate(
+    count_value ~ phase_id + taxon_column,
+    data = count_frame,
+    FUN = sum
+  )
+
+  taxon_levels <- sort(unique(aggregated_counts$taxon_column))
+  taxon_matrix <- matrix(
+    NA_real_,
+    nrow = length(phase_ids),
+    ncol = length(taxon_levels),
+    dimnames = list(NULL, taxon_levels)
+  )
+
+  taxon_matrix[
+    cbind(
+      match(aggregated_counts$phase_id, phase_ids),
+      match(aggregated_counts$taxon_column, taxon_levels)
+    )
+  ] <- aggregated_counts$count_value
+
+  as.data.frame(taxon_matrix, check.names = FALSE)
+}
+
+build_phase_assignment_data <- function(subregions, count_column) {
   coordinates <- sf::st_coordinates(sf::st_transform(subregions, 4326))
   phase_frame <- cbind(
     sf::st_drop_geometry(subregions),
@@ -327,7 +404,8 @@ build_phase_assignment_data <- function(subregions) {
   selected_columns <- c(selected_columns, culture_column[1])
   selected_columns <- unique(selected_columns)
 
-  phase_frame <- unique(phase_frame[, selected_columns, drop = FALSE])
+  phase_frame$phase_id <- phase_assignment_key(phase_frame)
+  phase_frame <- unique(phase_frame[, c("phase_id", selected_columns), drop = FALSE])
   column_labels <- c(
     SiteId = "Site ID",
     SiteName = "Site name",
@@ -344,7 +422,8 @@ build_phase_assignment_data <- function(subregions) {
     new_periods = "Time bin",
     phase = "Grouped phase"
   )
-  names(phase_frame) <- unname(column_labels[names(phase_frame)])
+  metadata_columns <- selected_columns
+  names(phase_frame)[match(metadata_columns, names(phase_frame))] <- unname(column_labels[metadata_columns])
 
   if ("Time bin" %in% names(phase_frame)) {
     phase_frame[["Time bin"]] <- as.character(phase_frame[["Time bin"]])
@@ -365,6 +444,16 @@ build_phase_assignment_data <- function(subregions) {
     }
     phase_frame <- phase_frame[do.call(order, ordering_frame), , drop = FALSE]
   }
+
+  taxon_counts <- build_phase_assignment_taxon_counts(
+    subregions = subregions,
+    count_column = count_column,
+    phase_ids = phase_frame$phase_id
+  )
+  phase_frame <- cbind(
+    phase_frame[, setdiff(names(phase_frame), "phase_id"), drop = FALSE],
+    taxon_counts
+  )
 
   rownames(phase_frame) <- NULL
   phase_frame
@@ -408,7 +497,7 @@ compute_analysis <- function(dataset, polygons, data_type, analysis_method = "ca
     subregions = subregions,
     count_matrix = ordination_bundle$matrix,
     ordination = ordination_bundle,
-    phase_assignments = build_phase_assignment_data(subregions),
+    phase_assignments = build_phase_assignment_data(subregions, count_column),
     combined_data = build_combined_data(ordination_bundle$matrix, ordination_bundle$row_coordinates),
     count_column = count_column,
     period_levels = resolve_period_levels(subregions$new_periods),

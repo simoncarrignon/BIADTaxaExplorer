@@ -263,11 +263,19 @@ compute_analysis <- function(dataset, polygons, data_type, use_logs = FALSE) {
   normalized_polygons <- normalize_polygon_data(polygons, dataset)
   selected_polygon_count <- if (is.null(normalized_polygons)) 0 else nrow(normalized_polygons)
   count_column <- count_column_for_type(data_type)
+  dataset_notes <- attr(dataset, "analysis_notes", exact = TRUE)
+  if (is.null(dataset_notes)) {
+    dataset_notes <- character(0)
+  }
 
   subregions <- prepare_analysis_data(dataset, normalized_polygons)
   count_bundle <- build_count_matrix(subregions, count_column, use_logs)
   used_polygon_count <- length(unique(subregions$new_area))
-  notes <- count_bundle$notes
+  notes <- c(count_bundle$notes, dataset_notes)
+
+  if (identical(data_type, "Combined")) {
+    notes <- c(notes, "Combined mode merges faunal NISP and botanical counts into the same matrix.")
+  }
 
   if (selected_polygon_count > used_polygon_count) {
     notes <- c(

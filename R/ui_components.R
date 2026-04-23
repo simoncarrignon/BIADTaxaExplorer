@@ -234,47 +234,70 @@ app_ui <- function() {
                   selectInput(
                     "data_type_selector",
                     "Dataset",
-                    choices = c("Faunal", "Botanical"),
+                    choices = c("Faunal", "Botanical", "Combined"),
                     selected = "Faunal"
                   ),
-                  selectInput("file_selector_tx", "Taxon grouping", choices = character(0)),
-                  tags$details(
-                    style = "margin-top: 4px; font-size: 11px;",
-                    tags$summary(
-                      style = "color: #999; cursor: pointer; user-select: none;",
-                      "group file options"
-                    ),
-                    div(
-                      style = "margin-top: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;",
+                  conditionalPanel(
+                    condition = "input.data_type_selector != 'Combined'",
+                    selectInput("file_selector_tx", "Taxon grouping", choices = character(0)),
+                    tags$details(
+                      style = "margin-top: 4px; font-size: 11px;",
+                      tags$summary(
+                        style = "color: #999; cursor: pointer; user-select: none;",
+                        "group file options"
+                      ),
                       div(
-                        style = "display: flex; gap: 8px;",
-                        downloadButton("download_group", "↓ download",
-                          style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
-                        ),
-                        actionButton("edit_group", "✎ edit labels",
-                          style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
+                        style = "margin-top: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;",
+                        div(
+                          style = "display: flex; gap: 8px;",
+                          downloadButton("download_group", "↓ download",
+                            style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
+                          ),
+                          actionButton("edit_group", "✎ edit labels",
+                            style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
+                          )
                         )
                       )
                     )
                   ),
-                  uiOutput("taxon_table"),
-                  tags$details(
-                    style = "margin-top: 4px; font-size: 11px;",
-                    tags$summary(
-                      style = "color: #999; cursor: pointer; user-select: none;",
-                      "upload new grouping file"
+                  conditionalPanel(
+                    condition = "input.data_type_selector == 'Combined'",
+                    selectInput(
+                      "file_selector_tx_combined_faunal",
+                      "Faunal grouping",
+                      choices = character(0)
                     ),
-                    div(
-                      style = "margin-top: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;",
-                      fileInput("upload_group", NULL,
-                        accept = ".csv",
-                        buttonLabel = "Upload .csv",
-                        placeholder = "no file selected",
-                        width = "100%"
+                    uiOutput("combined_botanical_groups_ui"),
+                    tags$p(
+                      class = "helper-text helper-text--compact",
+                      "Combined mode keeps all faunal groups from the chosen faunal scheme and lets you mix botanical subgroups from any botanical grouping file."
+                    ),
+                    tags$p(
+                      class = "helper-text helper-text--compact",
+                      "If selected botanical subgroups reuse the same taxa codes, the app will warn that those botanical counts are duplicated across the selected subgroups."
+                    )
+                  ),
+                  uiOutput("taxon_table"),
+                  conditionalPanel(
+                    condition = "input.data_type_selector != 'Combined'",
+                    tags$details(
+                      style = "margin-top: 4px; font-size: 11px;",
+                      tags$summary(
+                        style = "color: #999; cursor: pointer; user-select: none;",
+                        "upload new grouping file"
                       ),
-                        downloadButton("download_template", "↓ template",
-                          style = "font-size: 11px; padding: 2px 8px; height: auto; color: #888; background: #fff; border: 1px dashed #ccc;"
-                        )
+                      div(
+                        style = "margin-top: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;",
+                        fileInput("upload_group", NULL,
+                          accept = ".csv",
+                          buttonLabel = "Upload .csv",
+                          placeholder = "no file selected",
+                          width = "100%"
+                        ),
+                          downloadButton("download_template", "↓ template",
+                            style = "font-size: 11px; padding: 2px 8px; height: auto; color: #888; background: #fff; border: 1px dashed #ccc;"
+                          )
+                      )
                     )
                   )
                 ),

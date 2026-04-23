@@ -8,22 +8,64 @@ server <- function(input, output, session) {
   analysis_stale <- reactiveVal(FALSE)
 
   selected_dataset <- reactive({
-    if (identical(input$data_type_selector, "Botanical")) {
-      allBTaxa
-    } else {
+    switch(
+      input$data_type_selector,
+      "Botanical" = allBTaxa,
+      "Combined" = combine_taxa_datasets(allFTaxa, allBTaxa),
       allFTaxa
+    )
+  })
+
+  selected_grouping_label <- reactive({
+    if (!identical(input$data_type_selector, "Combined")) {
+      if (is.null(input$file_selector_tx)) {
+        return("—")
+      }
+
+      return(format_grouping_label(input$file_selector_tx))
     }
+
+    faunal_label <- if (is.null(input$file_selector_tx_combined_faunal)) {
+      "—"
+    } else {
+      format_grouping_label(input$file_selector_tx_combined_faunal)
+    }
+    botanical_groups <- input$combined_botanical_groups
+    if (is.null(botanical_groups)) {
+      botanical_groups <- character(0)
+    }
+    botanical_catalog <- group_catalog("Botanical")
+    selected_botanical <- botanical_catalog[match(botanical_groups, botanical_catalog$option_id), , drop = FALSE]
+    selected_botanical <- selected_botanical[!is.na(selected_botanical$option_id), , drop = FALSE]
+    botanical_suffix <- if (!length(botanical_groups)) {
+      "no botanical subgroups selected"
+    } else if (length(botanical_groups) <= 2) {
+      paste(selected_botanical$output_label, collapse = ", ")
+    } else {
+      sprintf("%s botanical subgroups", length(botanical_groups))
+    }
+
+    sprintf(
+      "Faunal: %s | Botanical: %s",
+      faunal_label,
+      botanical_suffix
+    )
   })
 
   selected_sites <- reactive({
-    if (identical(input$data_type_selector, "Botanical")) {
-      botanicalSites
-    } else {
+    switch(
+      input$data_type_selector,
+      "Botanical" = botanicalSites,
+      "Combined" = combine_site_points(faunalSites, botanicalSites),
       faunalSites
-    }
+    )
   })
 
   observe({
+    if (identical(input$data_type_selector, "Combined")) {
+      return()
+    }
+
     grouping_choices <- available_groupings(input$data_type_selector)
     if (!length(grouping_choices)) {
       return()
@@ -42,7 +84,59 @@ server <- function(input, output, session) {
     )
   })
 
+  observe({
+    grouping_choices <- available_groupings("Faunal")
+    if (!length(grouping_choices)) {
+      return()
+    }
+
+    selected_grouping <- isolate(input$file_selector_tx_combined_faunal)
+    if (is.null(selected_grouping) || !selected_grouping %in% unname(grouping_choices)) {
+      selected_grouping <- unname(grouping_choices)[1]
+    }
+
+    updateSelectInput(
+      session,
+      "file_selector_tx_combined_faunal",
+      choices = grouping_choices,
+      selected = selected_grouping
+    )
+  })
+
+  output$combined_botanical_groups_ui <- renderUI({
+    botanical_choices <- group_catalog_choices("Botanical")
+    selected_groups <- isolate(input$combined_botanical_groups)
+    if (is.null(selected_groups)) {
+      selected_groups <- character(0)
+    }
+    botanical_catalog <- group_catalog("Botanical")
+    selected_groups <- intersect(selected_groups, botanical_catalog$option_id)
+
+    selectizeInput(
+      "combined_botanical_groups",
+      "Botanical subgroups to include",
+      choices = botanical_choices,
+      selected = selected_groups,
+      multiple = TRUE,
+      options = list(
+        plugins = list("remove_button"),
+        placeholder = "Choose one or more botanical subgroups"
+      )
+    )
+  })
+
   grouped_dataset <- reactive({
+    if (identical(input$data_type_selector, "Combined")) {
+      return(
+        combine_grouped_taxa_datasets(
+          faunal_dataset = allFTaxa,
+          botanical_dataset = allBTaxa,
+          faunal_grouping_file = input$file_selector_tx_combined_faunal,
+          botanical_group_ids = input$combined_botanical_groups
+        )
+      )
+    }
+
     req(input$file_selector_tx)
     groupTaxons(selected_dataset(), input$file_selector_tx, logging = FALSE)
   })
@@ -71,6 +165,8 @@ server <- function(input, output, session) {
   observe({
     input$data_type_selector
     input$file_selector_tx
+    input$file_selector_tx_combined_faunal
+    input$combined_botanical_groups
     input$file_selector_per
     input$start_value
     input$end_value
@@ -84,23 +180,31 @@ server <- function(input, output, session) {
   })
 
   output$taxon_table <- renderUI({
+    if (identical(input$data_type_selector, "Combined") &&
+        (is.null(input$combined_botanical_groups) || !length(input$combined_botanical_groups))) {
+      return(
+        div(
+          class = "group-summary",
+          tags$p(
+            class = "helper-text helper-text--compact",
+            "Choose at least one botanical subgroup to build the combined grouped dataset."
+          )
+        )
+      )
+    }
+
     build_group_summary_ui(group_summary_stats(grouped_dataset()))
   })
 
   output$selection_summary <- renderUI({
     polygon_count <- if (is.null(current_polygons())) 0 else nrow(current_polygons())
-    grouping_label <- if (is.null(input$file_selector_tx)) {
-      "—"
-    } else {
-      format_grouping_label(input$file_selector_tx)
-    }
 
     build_selection_summary_ui(
       data_type = input$data_type_selector,
       site_count = nrow(selected_sites()),
       record_count = nrow(selected_dataset()),
       polygon_count = polygon_count,
-      grouping_label = grouping_label,
+      grouping_label = selected_grouping_label(),
       stale = analysis_stale(),
       has_results = !is.null(analysis_result())
     )
@@ -229,6 +333,10 @@ server <- function(input, output, session) {
 
       analysis_result(result)
       analysis_stale(FALSE)
+      overlap_warnings <- grep("^Selected botanical subgroups overlap", result$notes, value = TRUE)
+      if (length(overlap_warnings)) {
+        showNotification(overlap_warnings[[1]], type = "warning", duration = 10)
+      }
       showNotification("Analysis updated.", type = "message", duration = 3)
     }, error = function(error) {
       showNotification(conditionMessage(error), type = "error", duration = 8)

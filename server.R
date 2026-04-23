@@ -153,15 +153,6 @@ server <- function(input, output, session) {
     dataset
   })
 
-  observeEvent(input$use_logs, {
-    if (isTRUE(input$use_logs) && identical(input$analysis_method, "ca")) {
-      showNotification(
-        "Log transformation on CA should only be used for purely exploratory purposes and not for final interpretation/publication.",
-        type = "warning", duration = 8
-      )
-    }
-  }, ignoreInit = TRUE)
-
   observe({
     input$data_type_selector
     input$file_selector_tx
@@ -173,7 +164,7 @@ server <- function(input, output, session) {
     input$duration
     input$analysis_method
     input$pca_transform
-    input$use_logs
+    input$pca_scaling
     current_polygons()
 
     if (!is.null(isolate(analysis_result()))) {
@@ -326,8 +317,8 @@ server <- function(input, output, session) {
           polygons = polygons,
           data_type = input$data_type_selector,
           analysis_method = input$analysis_method,
-          use_logs = input$use_logs,
-          pca_transform = input$pca_transform
+          pca_transform = input$pca_transform,
+          pca_scaling = input$pca_scaling
         )
 
         incProgress(0.30, detail = "Packaging plots and exports")

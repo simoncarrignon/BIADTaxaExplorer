@@ -393,13 +393,6 @@ app_ui <- function() {
                   )
                 ),
                 conditionalPanel(
-                  condition = "input.analysis_method == 'ca'",
-                  div(
-                    class = "sidebar-option-row",
-                    checkboxInput("use_logs", "Apply log(count + 1) before CA", FALSE)
-                  )
-                ),
-                conditionalPanel(
                   condition = "input.analysis_method == 'pca'",
                   div(
                     class = "sidebar-subsection sidebar-time-surface",
@@ -412,9 +405,19 @@ app_ui <- function() {
                       ),
                       selected = "log1p"
                     ),
+                    selectInput(
+                      "pca_scaling",
+                      "PCA column scaling",
+                      choices = c(
+                        "Center + scale" = "scale",
+                        "Center only" = "center",
+                        "No centering or scaling" = "none"
+                      ),
+                      selected = "scale"
+                    ),
                     tags$p(
                       class = "sidebar-subsection-help",
-                      "The selected transform is applied first, then PCA uses centered and scaled taxon-group columns."
+                      "The selected transform is applied first, then PCA uses centered-and-scaled, centered-only, or uncentered columns."
                     )
                   )
                 )

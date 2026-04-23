@@ -179,16 +179,11 @@ build_count_matrix <- function(subregions, count_column) {
   list(counts = counts, notes = notes)
 }
 
-run_ordination <- function(count_matrix, analysis_method, use_logs = FALSE, pca_transform = "log1p") {
+run_ordination <- function(count_matrix, analysis_method, pca_transform = "log1p", pca_scaling = "scale") {
   notes <- character(0)
   ordination_matrix <- count_matrix
 
   if (identical(analysis_method, "ca")) {
-    if (isTRUE(use_logs)) {
-      ordination_matrix <- log(ordination_matrix + 1)
-      notes <- c(notes, "A log(count + 1) transform was applied before correspondence analysis.")
-    }
-
     model <- FactoMineR::CA(ordination_matrix, graph = FALSE)
     return(list(
       method = analysis_method,
@@ -226,22 +221,58 @@ run_ordination <- function(count_matrix, analysis_method, use_logs = FALSE, pca_
     stop("PCA needs at least two populated phase/area combinations and two taxon groups with non-zero variance.")
   }
 
-  model <- FactoMineR::PCA(
-    as.data.frame(ordination_matrix),
-    scale.unit = TRUE,
-    ncp = min(5, nrow(ordination_matrix) - 1L, ncol(ordination_matrix)),
-    graph = FALSE
+  if (identical(pca_scaling, "scale")) {
+    center_columns <- TRUE
+    scale_columns <- TRUE
+    notes <- c(notes, "PCA was run on centered and scaled taxon-group columns.")
+  } else if (identical(pca_scaling, "center")) {
+    center_columns <- TRUE
+    scale_columns <- FALSE
+    notes <- c(notes, "PCA was run on centered taxon-group columns without scaling.")
+  } else if (identical(pca_scaling, "none")) {
+    center_columns <- FALSE
+    scale_columns <- FALSE
+    notes <- c(notes, "PCA was run without centering or scaling taxon-group columns.")
+  } else {
+    stop("Unknown PCA scaling option selected.")
+  }
+
+  pca_input <- as.matrix(ordination_matrix)
+  model <- stats::prcomp(
+    pca_input,
+    center = center_columns,
+    scale. = scale_columns,
+    rank. = min(5, nrow(ordination_matrix) - 1L, ncol(ordination_matrix))
   )
-  notes <- c(notes, "PCA is run on centered and scaled taxon-group columns after the selected transform.")
+  retained_dimensions <- seq_len(ncol(model$rotation))
+  retained_sdev <- model$sdev[retained_dimensions]
+  eigenvalues <- retained_sdev^2
+  percentages <- eigenvalues / sum(eigenvalues) * 100
+  cumulative <- cumsum(percentages)
+  eig <- cbind(
+    eigenvalue = eigenvalues,
+    "percentage of variance" = percentages,
+    "cumulative percentage of variance" = cumulative
+  )
+  rownames(eig) <- paste("comp", seq_along(eigenvalues))
+  column_coordinates <- sweep(model$rotation, 2, retained_sdev, "*")
+
+  if (identical(pca_scaling, "scale")) {
+    notes <- c(notes, "Scaled PCA gives all taxon-group columns unit variance before decomposition.")
+  } else if (identical(pca_scaling, "center")) {
+    notes <- c(notes, "Centered-only PCA removes column means but keeps original variance differences.")
+  } else if (identical(pca_scaling, "none")) {
+    notes <- c(notes, "Uncentered PCA keeps both column means and variance differences.")
+  }
 
   list(
     method = analysis_method,
     method_label = analysis_method_label(analysis_method),
     diagnostic_label = ordination_diagnostic_label(analysis_method),
     matrix = ordination_matrix,
-    row_coordinates = as.matrix(model$ind$coord),
-    column_coordinates = as.matrix(model$var$coord),
-    eigenvalues = model$eig,
+    row_coordinates = as.matrix(model$x),
+    column_coordinates = as.matrix(column_coordinates),
+    eigenvalues = eig,
     notes = notes
   )
 }
@@ -339,7 +370,7 @@ build_phase_assignment_data <- function(subregions) {
   phase_frame
 }
 
-compute_analysis <- function(dataset, polygons, data_type, analysis_method = "ca", use_logs = FALSE, pca_transform = "log1p") {
+compute_analysis <- function(dataset, polygons, data_type, analysis_method = "ca", pca_transform = "log1p", pca_scaling = "scale") {
   normalized_polygons <- normalize_polygon_data(polygons, dataset)
   selected_polygon_count <- if (is.null(normalized_polygons)) 0 else nrow(normalized_polygons)
   count_column <- count_column_for_type(data_type)
@@ -353,8 +384,8 @@ compute_analysis <- function(dataset, polygons, data_type, analysis_method = "ca
   ordination_bundle <- run_ordination(
     count_matrix = count_bundle$counts,
     analysis_method = analysis_method,
-    use_logs = use_logs,
-    pca_transform = pca_transform
+    pca_transform = pca_transform,
+    pca_scaling = pca_scaling
   )
   used_polygon_count <- length(unique(subregions$new_area))
   notes <- c(count_bundle$notes, dataset_notes, ordination_bundle$notes)

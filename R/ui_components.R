@@ -500,6 +500,8 @@ app_ui <- function() {
                       class = "plot-caption",
                       "Ordination map with arrows that track phase order inside each polygon."
                     ),
+                    checkboxInput("plot_add_culture", "Add culture", FALSE),
+                    uiOutput("plot_culture_limit_ui"),
                     plotOutput("plot3", height = "520px")
                   ),
                   tabPanel(

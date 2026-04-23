@@ -193,6 +193,9 @@ run_ordination <- function(count_matrix, analysis_method, pca_transform = "log1p
       row_coordinates = as.matrix(model$row$coord),
       column_coordinates = as.matrix(model$col$coord),
       eigenvalues = model$eig,
+      model = model,
+      pca_transform = NULL,
+      pca_scaling = NULL,
       notes = notes
     ))
   }
@@ -273,7 +276,125 @@ run_ordination <- function(count_matrix, analysis_method, pca_transform = "log1p
     row_coordinates = as.matrix(model$x),
     column_coordinates = as.matrix(column_coordinates),
     eigenvalues = eig,
+    model = model,
+    pca_transform = pca_transform,
+    pca_scaling = pca_scaling,
     notes = notes
+  )
+}
+
+build_culture_count_matrix <- function(subregions, count_column, target_columns) {
+  culture_column <- intersect(c("Culture", "Culture1"), names(subregions))[1]
+  if (is.na(culture_column) || is.null(culture_column)) {
+    return(NULL)
+  }
+
+  culture_values <- trimws(as.character(subregions[[culture_column]]))
+  valid_rows <- !is.na(subregions$new_txgroups) & nzchar(culture_values)
+  if (!any(valid_rows)) {
+    return(NULL)
+  }
+
+  culture_counts <- tapply(
+    subregions[[count_column]][valid_rows],
+    list(culture_values[valid_rows], subregions$new_txgroups[valid_rows]),
+    sum,
+    na.rm = TRUE
+  )
+  culture_counts <- as.matrix(culture_counts)
+  culture_counts[is.na(culture_counts)] <- 0
+
+  if (!nrow(culture_counts) || !ncol(culture_counts)) {
+    return(NULL)
+  }
+
+  aligned_counts <- matrix(
+    0,
+    nrow = nrow(culture_counts),
+    ncol = length(target_columns),
+    dimnames = list(rownames(culture_counts), target_columns)
+  )
+  shared_columns <- intersect(colnames(culture_counts), target_columns)
+  aligned_counts[, shared_columns] <- culture_counts[, shared_columns, drop = FALSE]
+  aligned_counts <- aligned_counts[rowSums(aligned_counts) > 0, , drop = FALSE]
+
+  if (!nrow(aligned_counts)) {
+    return(NULL)
+  }
+
+  record_support <- sort(table(culture_values[valid_rows]), decreasing = TRUE)
+  support_summary <- data.frame(
+    culture = rownames(aligned_counts),
+    record_count = as.integer(record_support[rownames(aligned_counts)]),
+    total_count = as.numeric(rowSums(aligned_counts)),
+    stringsAsFactors = FALSE,
+    row.names = NULL
+  )
+  support_summary$record_count[is.na(support_summary$record_count)] <- 0L
+  support_summary <- support_summary[
+    order(-support_summary$record_count, -support_summary$total_count, support_summary$culture),
+    ,
+    drop = FALSE
+  ]
+  rownames(support_summary) <- support_summary$culture
+
+  list(
+    counts = aligned_counts,
+    summary = support_summary
+  )
+}
+
+project_culture_coordinates <- function(subregions, count_column, ordination_bundle) {
+  target_columns <- colnames(ordination_bundle$matrix)
+  if (is.null(target_columns) || !length(target_columns)) {
+    return(NULL)
+  }
+
+  culture_bundle <- build_culture_count_matrix(
+    subregions = subregions,
+    count_column = count_column,
+    target_columns = target_columns
+  )
+  if (is.null(culture_bundle) || !nrow(culture_bundle$counts)) {
+    return(NULL)
+  }
+  culture_counts <- culture_bundle$counts
+
+  if (identical(ordination_bundle$method, "ca")) {
+    row_profiles <- sweep(culture_counts, 1, rowSums(culture_counts), FUN = "/")
+    coordinates <- crossprod(
+      t(as.matrix(row_profiles)),
+      ordination_bundle$model$svd$V
+    )
+    coordinates <- as.matrix(coordinates)
+    rownames(coordinates) <- rownames(culture_counts)
+  } else if (identical(ordination_bundle$method, "pca")) {
+    pca_input <- culture_counts
+    if (identical(ordination_bundle$pca_transform, "log1p")) {
+      pca_input <- log(pca_input + 1)
+    }
+
+    coordinates <- as.matrix(
+      stats::predict(
+        ordination_bundle$model,
+        newdata = as.data.frame(pca_input, check.names = FALSE)
+      )
+    )
+  } else {
+    return(NULL)
+  }
+
+  if (!nrow(coordinates) || !ncol(coordinates)) {
+    return(NULL)
+  }
+
+  coordinates <- coordinates[, seq_len(min(ncol(coordinates), ncol(ordination_bundle$row_coordinates))), drop = FALSE]
+  colnames(coordinates) <- colnames(ordination_bundle$row_coordinates)[seq_len(ncol(coordinates))]
+
+  list(
+    coordinates = coordinates,
+    counts = culture_counts,
+    summary = culture_bundle$summary
   )
 }
 
@@ -476,6 +597,11 @@ compute_analysis <- function(dataset, polygons, data_type, analysis_method = "ca
     pca_transform = pca_transform,
     pca_scaling = pca_scaling
   )
+  culture_projection <- project_culture_coordinates(
+    subregions = subregions,
+    count_column = count_column,
+    ordination_bundle = ordination_bundle
+  )
   used_polygon_count <- length(unique(subregions$new_area))
   notes <- c(count_bundle$notes, dataset_notes, ordination_bundle$notes)
 
@@ -497,6 +623,7 @@ compute_analysis <- function(dataset, polygons, data_type, analysis_method = "ca
     subregions = subregions,
     count_matrix = ordination_bundle$matrix,
     ordination = ordination_bundle,
+    culture_projection = culture_projection,
     phase_assignments = build_phase_assignment_data(subregions, count_column),
     combined_data = build_combined_data(ordination_bundle$matrix, ordination_bundle$row_coordinates),
     count_column = count_column,

@@ -416,10 +416,58 @@ server <- function(input, output, session) {
     byCultureComposition(result$subregions, result$count_column)
   })
 
+  output$plot_culture_limit_ui <- renderUI({
+    result <- analysis_result()
+    if (!isTRUE(input$plot_add_culture) || is.null(result) || is.null(result$culture_projection)) {
+      return(NULL)
+    }
+
+    culture_summary <- result$culture_projection$summary
+    if (is.null(culture_summary) || nrow(culture_summary) <= 1) {
+      return(NULL)
+    }
+
+    max_cultures <- nrow(culture_summary)
+    selected_limit <- isolate(input$plot_culture_limit)
+    if (is.null(selected_limit) || !is.numeric(selected_limit) || selected_limit < 1) {
+      selected_limit <- min(20, max_cultures)
+    }
+    selected_limit <- min(selected_limit, max_cultures)
+
+    sliderInput(
+      "plot_culture_limit",
+      "Top cultures by number of grouped records",
+      min = 1,
+      max = max_cultures,
+      value = selected_limit,
+      step = 1,
+      width = "100%"
+    )
+  })
+
   output$plot3 <- renderPlot({
     result <- analysis_result()
     shiny::validate(shiny::need(!is.null(result), "Run analysis to view the ordination map."))
-    plotOrdinationArrows(result$ordination, period_levels = result$period_levels)
+    culture_coordinates <- NULL
+    if (isTRUE(input$plot_add_culture) && !is.null(result$culture_projection)) {
+      culture_summary <- result$culture_projection$summary
+      culture_coordinates <- result$culture_projection$coordinates
+
+      if (!is.null(culture_summary) && nrow(culture_summary)) {
+        culture_limit <- input$plot_culture_limit
+        if (is.null(culture_limit) || !is.numeric(culture_limit) || culture_limit < 1) {
+          culture_limit <- min(20, nrow(culture_summary))
+        }
+        selected_cultures <- head(rownames(culture_summary), min(culture_limit, nrow(culture_summary)))
+        culture_coordinates <- culture_coordinates[selected_cultures, , drop = FALSE]
+      }
+    }
+
+    plotOrdinationArrows(
+      result$ordination,
+      period_levels = result$period_levels,
+      culture_coordinates = culture_coordinates
+    )
   })
 
   output$plot4 <- renderPlot({

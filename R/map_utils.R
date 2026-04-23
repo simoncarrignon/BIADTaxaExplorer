@@ -34,6 +34,15 @@ normalize_polygon_data <- function(polygons, reference_data) {
   normalized
 }
 
+load_polygon_file <- function(path, reference_data) {
+  if (is.null(path) || !nzchar(path) || !file.exists(path)) {
+    return(NULL)
+  }
+
+  polygons <- sf::st_read(path, quiet = TRUE)
+  normalize_polygon_data(polygons, reference_data)
+}
+
 complete_polygon_attributes <- function(attribute_frame, all_names) {
   missing_names <- setdiff(all_names, names(attribute_frame))
 

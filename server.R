@@ -3,9 +3,11 @@ server <- function(input, output, session) {
     check.conn(conn)
   }
 
+  default_polygon_path <- "groupings/spatial/ss_three_polygons_230126.gpkg"
   current_polygons <- reactiveVal(NULL)
   analysis_result <- reactiveVal(NULL)
   analysis_stale <- reactiveVal(FALSE)
+  default_polygons_attempted <- reactiveVal(FALSE)
 
   selected_dataset <- reactive({
     switch(
@@ -249,6 +251,36 @@ server <- function(input, output, session) {
         markerOptions = FALSE,
         circleMarkerOptions = FALSE
       )
+  })
+
+  observe({
+    if (default_polygons_attempted()) {
+      return()
+    }
+
+    points <- selected_sites()
+    if (is.null(points) || !nrow(points)) {
+      return()
+    }
+
+    default_polygons_attempted(TRUE)
+    default_polygons <- tryCatch(
+      load_polygon_file(default_polygon_path, points),
+      error = function(error) {
+        warning(
+          sprintf(
+            "Failed to load default polygons from '%s': %s",
+            default_polygon_path,
+            conditionMessage(error)
+          )
+        )
+        NULL
+      }
+    )
+
+    if (!is.null(default_polygons)) {
+      current_polygons(default_polygons)
+    }
   })
 
   observeEvent(selected_sites(), {

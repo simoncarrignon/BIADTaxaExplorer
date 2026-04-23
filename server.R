@@ -247,6 +247,12 @@ server <- function(input, output, session) {
     bySpeciesComposition(result$subregions, result$count_column)
   })
 
+  output$plot2_culture <- renderPlot({
+    result <- analysis_result()
+    shiny::validate(shiny::need(!is.null(result), "Run analysis to view culture composition."))
+    byCultureComposition(result$subregions, result$count_column)
+  })
+
   output$plot3 <- renderPlot({
     result <- analysis_result()
     shiny::validate(shiny::need(!is.null(result), "Run analysis to view the CA map."))

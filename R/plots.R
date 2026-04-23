@@ -124,6 +124,68 @@ bySpeciesComposition <- function(dataset, count_column) {
   }
 }
 
+byCultureComposition <- function(dataset, count_column) {
+  culture_column <- intersect(c("Culture", "Culture1"), names(dataset))[1]
+
+  if (is.na(culture_column) || is.null(culture_column)) {
+    empty_plot_message("No culture field is available for the selected dataset.")
+    return(invisible(NULL))
+  }
+
+  culture_values <- trimws(as.character(dataset[[culture_column]]))
+  valid_rows <- !is.na(dataset$new_txgroups) & nzchar(culture_values)
+  dataset <- dataset[valid_rows, , drop = FALSE]
+  culture_values <- culture_values[valid_rows]
+
+  if (nrow(dataset) == 0) {
+    empty_plot_message("No grouped taxa with culture information are available.")
+    return(invisible(NULL))
+  }
+
+  composition <- tapply(
+    dataset[[count_column]],
+    list(dataset$new_txgroups, culture_values),
+    sum,
+    na.rm = TRUE
+  )
+  composition <- as.matrix(composition)
+  composition[is.na(composition)] <- 0
+  composition <- composition[rowSums(composition) > 0, , drop = FALSE]
+  composition <- composition[, colSums(composition) > 0, drop = FALSE]
+
+  if (nrow(composition) == 0 || ncol(composition) == 0) {
+    empty_plot_message("No grouped taxa with culture information are available.")
+    return(invisible(NULL))
+  }
+
+  proportions <- sweep(composition, 2, colSums(composition), FUN = "/")
+  proportions[is.na(proportions)] <- 0
+  group_colors <- palette.colors(max(nrow(proportions), 1), "Pastel 2", recycle = TRUE)
+
+  old_par <- par(no.readonly = TRUE)
+  on.exit(par(old_par), add = TRUE)
+
+  par(mar = c(9, 4, 4, 1), xpd = TRUE)
+  barplot(
+    proportions,
+    col = group_colors[seq_len(nrow(proportions))],
+    las = 2,
+    ylab = "Share of counts",
+    main = "Taxon composition by culture",
+    border = NA
+  )
+
+  legend(
+    "topright",
+    legend = rownames(proportions),
+    fill = group_colors[seq_len(nrow(proportions))],
+    bg = "white",
+    cex = 0.8,
+    bty = "n",
+    inset = c(-0.02, 0)
+  )
+}
+
 shorten_segments <- function(coordinates, shorten_length = 0.03) {
   if (nrow(coordinates) < 2) {
     return(NULL)

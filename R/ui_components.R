@@ -438,7 +438,12 @@ app_ui <- function() {
                       class = "plot-caption",
                       "Relative share of taxon groups across periods within each polygon."
                     ),
-                    plotOutput("plot2", height = "340px")
+                    plotOutput("plot2", height = "340px"),
+                    tags$p(
+                      class = "plot-caption",
+                      "Relative share of taxon groups within each culture, aggregated across time bins, phases, and selected polygons."
+                    ),
+                    plotOutput("plot2_culture", height = "420px")
                   ),
                   tabPanel(
                     "CA map",

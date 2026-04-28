@@ -716,7 +716,7 @@ body {
 }
 
 .plot-caption {
-  margin: 0 0 12px;
+  margin: 8px 0 12px;
   color: var(--biad-muted);
   font-size: 13px;
 }

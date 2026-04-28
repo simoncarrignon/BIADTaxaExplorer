@@ -424,6 +424,12 @@ server <- function(input, output, session) {
     bySpeciesComposition(result$subregions, result$count_column)
   })
 
+  output$plot2_legend <- renderPlot({
+    result <- analysis_result()
+    shiny::validate(shiny::need(!is.null(result), "Run analysis to view taxon composition."))
+    plotTaxonGroupLegend(result$subregions)
+  })
+
   output$plot2_culture <- renderPlot({
     result <- analysis_result()
     shiny::validate(shiny::need(!is.null(result), "Run analysis to view culture composition."))

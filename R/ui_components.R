@@ -467,66 +467,70 @@ app_ui <- function() {
             ),
             section_card(
               title = "Analysis results",
-              subtitle = "Compare raw counts, taxon composition, and correspondence-analysis structure.",
-              uiOutput("analysis_status"),
               div(
                 class = "results-tabs",
                 tabsetPanel(
                   id = "results_tabs",
                   tabPanel(
                     "Raw counts",
+                    plotOutput("plot1", height = "320px"),
                     tags$p(
                       class = "plot-caption",
                       "Total counts per period for each selected polygon."
-                    ),
-                    plotOutput("plot1", height = "320px")
+                    )
                   ),
                   tabPanel(
                     "Composition",
+                    plotOutput("plot2_legend", height = "150px"),
+                    plotOutput("plot2", height = "340px"),
                     tags$p(
                       class = "plot-caption",
                       "Relative share of taxon groups across periods within each polygon."
                     ),
-                    plotOutput("plot2", height = "340px"),
+                    plotOutput("plot2_culture", height = "420px"),
                     tags$p(
                       class = "plot-caption",
                       "Relative share of taxon groups within each culture, aggregated across time bins, phases, and selected polygons."
-                    ),
-                    plotOutput("plot2_culture", height = "420px")
+                    )
                   ),
                   tabPanel(
                     "Ordination map",
+                    checkboxInput("plot_add_culture", "Add culture", FALSE),
+                    uiOutput("plot_culture_limit_ui"),
+                    plotOutput("plot3", height = "520px"),
                     tags$p(
                       class = "plot-caption",
                       "Ordination map with arrows that track phase order inside each polygon."
-                    ),
-                    checkboxInput("plot_add_culture", "Add culture", FALSE),
-                    uiOutput("plot_culture_limit_ui"),
-                    plotOutput("plot3", height = "520px")
+                    )
                   ),
                   tabPanel(
                     "Dimensions",
+                    plotOutput("plot4", height = "520px"),
                     tags$p(
                       class = "plot-caption",
                       "How the first two ordination dimensions evolve across time for each polygon."
                     ),
-                    plotOutput("plot4", height = "520px"),
+                    plotOutput("plot4_diag", height = "280px"),
                     tags$p(
                       class = "plot-caption",
                       "Diagnostic view of variance explained for PCA or inertia explained for CA."
-                    ),
-                    plotOutput("plot4_diag", height = "280px")
+                    )
                   ),
                   tabPanel(
                     "Data preview",
+                    tableOutput("analysis_preview"),
                     tags$p(
                       class = "plot-caption",
                       "Preview of the exported aggregated table."
-                    ),
-                    tableOutput("analysis_preview")
+                    )
                   )
                 )
-              )
+              ),
+              tags$p(
+                class = "plot-caption",
+                "Compare raw counts, taxon composition, and correspondence-analysis structure."
+              ),
+              uiOutput("analysis_status")
             )
           )
         )

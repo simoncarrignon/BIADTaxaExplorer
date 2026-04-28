@@ -9,6 +9,97 @@ taxon_group_palette <- function(group_names) {
   stats::setNames(colors[seq_along(group_names)], group_names)
 }
 
+legend_text_size <- function(labels, base = 1.02, minimum = 0.82) {
+  entry_count <- length(labels)
+  longest_label <- max(nchar(as.character(labels)), 0)
+  size <- base
+
+  if (entry_count > 8) {
+    size <- size - 0.04 * (entry_count - 8)
+  }
+  if (longest_label > 18) {
+    size <- size - 0.01 * (longest_label - 18)
+  }
+
+  max(minimum, min(base, size))
+}
+
+legend_column_count <- function(labels) {
+  entry_count <- length(labels)
+  if (entry_count > 18) {
+    return(3)
+  }
+  if (entry_count > 9) {
+    return(2)
+  }
+  1
+}
+
+separate_legend_column_count <- function(labels) {
+  entry_count <- length(labels)
+  if (entry_count > 15) {
+    return(4)
+  }
+  if (entry_count > 7) {
+    return(3)
+  }
+  if (entry_count > 3) {
+    return(2)
+  }
+  1
+}
+
+clear_plot_legend <- function(position = "topright", labels, ..., cex = NULL, ncol = NULL, inset = 0) {
+  labels <- as.character(labels)
+  if (is.null(cex)) {
+    cex <- legend_text_size(labels)
+  }
+  if (is.null(ncol)) {
+    ncol <- legend_column_count(labels)
+  }
+
+  legend(
+    position,
+    legend = labels,
+    ...,
+    bg = "#ffffff",
+    box.col = "#cbd5e1",
+    text.col = "#111827",
+    border = "#cbd5e1",
+    bty = "o",
+    cex = cex,
+    ncol = ncol,
+    x.intersp = 0.8,
+    y.intersp = 1.05,
+    inset = inset
+  )
+}
+
+plotTaxonGroupLegend <- function(dataset) {
+  group_names <- sort(unique(as.character(stats::na.omit(dataset$new_txgroups))))
+
+  if (!length(group_names)) {
+    empty_plot_message("No taxon groups are available for the current selection.")
+    return(invisible(NULL))
+  }
+
+  group_colors <- taxon_group_palette(group_names)
+
+  old_par <- par(no.readonly = TRUE)
+  on.exit(par(old_par), add = TRUE)
+
+  par(mar = c(0.5, 0.5, 1.2, 0.5), xpd = NA)
+  plot.new()
+  title("Taxon group legend", cex.main = 1.08, line = 0.2)
+  clear_plot_legend(
+    "center",
+    labels = names(group_colors),
+    fill = unname(group_colors),
+    cex = legend_text_size(names(group_colors), base = 1.08, minimum = 0.9),
+    ncol = separate_legend_column_count(names(group_colors))
+  )
+}
+
 countTotal <- function(dataset, count_column) {
   counts <- tapply(
     dataset[[count_column]],
@@ -58,14 +149,13 @@ countTotal <- function(dataset, count_column) {
   }
 
   axis(1, at = x_positions, labels = rownames(counts), las = 2)
-  legend(
+  clear_plot_legend(
     "topright",
-    legend = paste("Area", area_ids),
+    labels = paste("Area", area_ids),
     col = area_colors,
     lwd = 2.5,
     pch = 16,
-    bg = "white",
-    bty = "n"
+    cex = 1.08
   )
 }
 
@@ -121,17 +211,6 @@ bySpeciesComposition <- function(dataset, count_column) {
       border = NA
     )
 
-    if (area_index == length(area_ids)) {
-      legend(
-        "topright",
-        legend = names(group_colors),
-        fill = unname(group_colors),
-        bg = "white",
-        cex = 0.8,
-        bty = "n",
-        inset = c(-0.2, 0)
-      )
-    }
   }
 }
 
@@ -186,15 +265,7 @@ byCultureComposition <- function(dataset, count_column) {
     border = NA
   )
 
-  legend(
-    "topright",
-    legend = names(group_colors),
-    fill = unname(group_colors),
-    bg = "white",
-    cex = 0.8,
-    bty = "n",
-    inset = c(-0.02, 0)
-  )
+  invisible(NULL)
 }
 
 shorten_segments <- function(coordinates, shorten_length = 0.03) {
@@ -345,14 +416,13 @@ plotOrdinationArrows <- function(ordination_result, period_levels = NULL, cultur
     legend_symbols <- c(legend_symbols, 17)
   }
 
-  legend(
+  clear_plot_legend(
     "topright",
-    legend = legend_labels,
+    labels = legend_labels,
     col = legend_colors,
     pch = legend_symbols,
-    bg = "white",
     lwd = 2.2,
-    bty = "n"
+    cex = 1.05
   )
 }
 
@@ -424,14 +494,13 @@ plotOrdinationDimensions <- function(ordination_result, period_levels = NULL) {
       )
     }
 
-    legend(
+    clear_plot_legend(
       "topright",
-      legend = paste("Area", area_ids),
+      labels = paste("Area", area_ids),
       col = area_colors,
       lwd = 2.2,
-    bg = "white",
       pch = 16,
-      bty = "n"
+      cex = 1.05
     )
   }
 }

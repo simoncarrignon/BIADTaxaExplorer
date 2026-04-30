@@ -5,7 +5,7 @@ empty_plot_message <- function(message) {
 
 taxon_group_palette <- function(group_names) {
   group_names <- sort(unique(as.character(group_names)))
-  colors <- palette.colors(max(length(group_names), 1), "Pastel 2", recycle = TRUE)
+  colors <- palette.colors(max(length(group_names), 1), "Dark 2", recycle = TRUE)
   stats::setNames(colors[seq_along(group_names)], group_names)
 }
 
@@ -335,13 +335,44 @@ plotOrdinationArrows <- function(ordination_result, period_levels = NULL, cultur
   coordinate_frame$period <- factor(coordinate_frame$period, levels = period_levels, ordered = TRUE)
   area_ids <- sort(unique(coordinate_frame$area))
   area_colors <- palette.colors(max(length(area_ids), 1), "Pastel 1", recycle = TRUE)
+  column_coordinates <- if (is.null(ordination_result$column_coordinates)) NULL else as.matrix(ordination_result$column_coordinates)
+  culture_matrix <- if (is.null(culture_coordinates)) NULL else as.matrix(culture_coordinates)
+
+  plot_x <- row_coordinates[, 1]
+  plot_y <- row_coordinates[, 2]
+  if (!is.null(column_coordinates) && nrow(column_coordinates) && ncol(column_coordinates) >= 2) {
+    plot_x <- c(plot_x, column_coordinates[, 1])
+    plot_y <- c(plot_y, column_coordinates[, 2])
+  }
+  if (!is.null(culture_matrix) && nrow(culture_matrix) && ncol(culture_matrix) >= 2) {
+    plot_x <- c(plot_x, culture_matrix[, 1])
+    plot_y <- c(plot_y, culture_matrix[, 2])
+  }
+
+  plot_x <- plot_x[is.finite(plot_x)]
+  plot_y <- plot_y[is.finite(plot_y)]
+  x_range <- range(plot_x, na.rm = TRUE)
+  y_range <- range(plot_y, na.rm = TRUE)
+  if (!all(is.finite(x_range)) || diff(x_range) == 0) {
+    x_range <- x_range + c(-1, 1)
+  }
+  if (!all(is.finite(y_range)) || diff(y_range) == 0) {
+    y_range <- y_range + c(-1, 1)
+  }
+
+  x_padding <- diff(x_range) * 0.22
+  y_padding <- diff(y_range) * 0.20
+  x_limits <- x_range + c(-x_padding, x_padding * 1.45)
+  y_limits <- y_range + c(-y_padding, y_padding * 1.35)
 
   plot(
     row_coordinates[, 1],
     row_coordinates[, 2],
     type = "n",
     xlab = x_name,
-    ylab = y_name
+    ylab = y_name,
+    xlim = x_limits,
+    ylim = y_limits
   )
   abline(v = 0, h = 0, lty = 2, col = "#9ca3af")
 
@@ -373,13 +404,13 @@ plotOrdinationArrows <- function(ordination_result, period_levels = NULL, cultur
     }
   }
 
-  column_coordinates <- as.matrix(ordination_result$column_coordinates)
   if (!is.null(column_coordinates) && ncol(column_coordinates) >= 2) {
     text(
       column_coordinates[, 1],
       column_coordinates[, 2],
       rownames(column_coordinates),
-      col = "darkgreen",
+      pos = 4,
+      col = "#111827",
       font = 3
     )
   }

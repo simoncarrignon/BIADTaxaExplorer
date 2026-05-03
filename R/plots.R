@@ -601,17 +601,25 @@ plotOrdinationArrows <- function(
   label_frame <- label_frame[nzchar(label_frame$label), , drop = FALSE]
   label_frame$label_fill_key <- label_frame$legend_key
 
+  label_fill_alpha <- 0.66
   color_values <- area_colors
-  fill_values <- area_colors
+  fill_values <- grDevices::adjustcolor(area_colors, alpha.f = label_fill_alpha)
+  names(fill_values) <- names(area_colors)
   legend_breaks <- area_keys
   if (nrow(column_frame)) {
     color_values <- c(color_values, "Taxon group" = "#111827")
-    fill_values <- c(fill_values, "Taxon group" = "#f8fafc")
+    fill_values <- c(
+      fill_values,
+      "Taxon group" = grDevices::adjustcolor("#f8fafc", alpha.f = 0.76)
+    )
     legend_breaks <- c(legend_breaks, "Taxon group")
   }
   if (nrow(culture_frame)) {
     color_values <- c(color_values, "Culture" = "#b45309")
-    fill_values <- c(fill_values, "Culture" = "#ffedd5")
+    fill_values <- c(
+      fill_values,
+      "Culture" = grDevices::adjustcolor("#ffedd5", alpha.f = 0.76)
+    )
     legend_breaks <- c(legend_breaks, "Culture")
   }
 

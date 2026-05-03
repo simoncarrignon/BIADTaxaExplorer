@@ -721,6 +721,88 @@ body {
   font-size: 13px;
 }
 
+.ordination-label-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  margin: 2px 0 10px;
+}
+
+.ordination-label-controls .shiny-input-container {
+  width: auto;
+  margin: 0;
+}
+
+.ordination-label-controls .checkbox {
+  margin: 0;
+}
+
+.ordination-label-controls label {
+  margin: 0;
+  font-weight: 700;
+  color: var(--biad-dark);
+}
+
+.ordination-plot-shell {
+  position: relative;
+}
+
+.ordination-plot-shell .shiny-plot-output {
+  position: relative;
+}
+
+.ordination-plot-shell .shiny-plot-output.recalculating::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.ordination-plot-shell .shiny-plot-output.recalculating::after {
+  content: "Placing labels...";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 6;
+  transform: translate(-50%, -50%);
+  padding: 10px 14px 10px 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--biad-dark);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+}
+
+.ordination-plot-shell::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 65px);
+  top: calc(50% - 7px);
+  z-index: 7;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #cbd5e1;
+  border-top-color: var(--biad-blue);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  animation: ordination-spin 0.75s linear infinite;
+}
+
+.ordination-plot-shell:has(.shiny-plot-output.recalculating)::after {
+  opacity: 1;
+}
+
+@keyframes ordination-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 #analysis_preview {
   font-size: 13px;
 }

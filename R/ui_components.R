@@ -495,9 +495,17 @@ app_ui <- function() {
                   ),
                   tabPanel(
                     "Ordination map",
-                    checkboxInput("plot_add_culture", "Add culture", FALSE),
+                    div(
+                      class = "ordination-label-controls",
+                      checkboxInput("plot_label_year", "Year", FALSE),
+                      checkboxInput("plot_label_taxa", "Taxa", FALSE),
+                      checkboxInput("plot_label_culture", "Culture", FALSE)
+                    ),
                     uiOutput("plot_culture_limit_ui"),
-                    plotOutput("plot3", height = "520px"),
+                    div(
+                      class = "ordination-plot-shell",
+                      plotOutput("plot3", height = "680px")
+                    ),
                     tags$p(
                       class = "plot-caption",
                       "Ordination map with arrows that track phase order inside each polygon."

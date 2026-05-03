@@ -438,7 +438,7 @@ server <- function(input, output, session) {
 
   output$plot_culture_limit_ui <- renderUI({
     result <- analysis_result()
-    if (!isTRUE(input$plot_add_culture) || is.null(result) || is.null(result$culture_projection)) {
+    if (!isTRUE(input$plot_label_culture) || is.null(result) || is.null(result$culture_projection)) {
       return(NULL)
     }
 
@@ -469,7 +469,7 @@ server <- function(input, output, session) {
     result <- analysis_result()
     shiny::validate(shiny::need(!is.null(result), "Run analysis to view the ordination map."))
     culture_coordinates <- NULL
-    if (isTRUE(input$plot_add_culture) && !is.null(result$culture_projection)) {
+    if (isTRUE(input$plot_label_culture) && !is.null(result$culture_projection)) {
       culture_summary <- result$culture_projection$summary
       culture_coordinates <- result$culture_projection$coordinates
 
@@ -486,7 +486,10 @@ server <- function(input, output, session) {
     plotOrdinationArrows(
       result$ordination,
       period_levels = result$period_levels,
-      culture_coordinates = culture_coordinates
+      culture_coordinates = culture_coordinates,
+      show_year_labels = isTRUE(input$plot_label_year),
+      show_taxa_labels = isTRUE(input$plot_label_taxa),
+      show_culture_labels = isTRUE(input$plot_label_culture)
     )
   })
 

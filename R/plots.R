@@ -287,7 +287,8 @@ shorten_segments <- function(coordinates, shorten_length = 0.03) {
   end_points <- end_points[valid_rows, , drop = FALSE]
   delta <- delta[valid_rows, , drop = FALSE]
   distance <- distance[valid_rows]
-  scale <- shorten_length / distance
+  shorten <- pmin(shorten_length, distance * 0.42)
+  scale <- shorten / distance
 
   cbind(
     x0 = start_points[, 1] + delta[, 1] * scale,
@@ -309,7 +310,7 @@ present_period_levels <- function(period_values, period_levels = NULL) {
   resolve_period_levels(period_values)
 }
 
-plotOrdinationArrows <- function(ordination_result, period_levels = NULL, culture_coordinates = NULL) {
+plotOrdinationArrowsBase <- function(ordination_result, period_levels = NULL, culture_coordinates = NULL) {
   old_par <- par(no.readonly = TRUE)
   on.exit(par(old_par), add = TRUE)
 
@@ -455,6 +456,281 @@ plotOrdinationArrows <- function(ordination_result, period_levels = NULL, cultur
     lwd = 2.2,
     cex = 1.05
   )
+}
+
+plotOrdinationArrows <- function(
+  ordination_result,
+  period_levels = NULL,
+  culture_coordinates = NULL,
+  show_year_labels = FALSE,
+  show_taxa_labels = FALSE,
+  show_culture_labels = FALSE
+) {
+  if (!requireNamespace("ggplot2", quietly = TRUE) || !requireNamespace("ggrepel", quietly = TRUE)) {
+    plotOrdinationArrowsBase(ordination_result, period_levels, culture_coordinates)
+    return(invisible(NULL))
+  }
+
+  row_coordinates <- as.matrix(ordination_result$row_coordinates)
+  if (is.null(colnames(row_coordinates))) {
+    colnames(row_coordinates) <- paste("Dim", seq_len(ncol(row_coordinates)))
+  }
+  if (ncol(row_coordinates) < 2) {
+    empty_plot_message(sprintf("At least two dimensions are needed for the %s map.", tolower(ordination_result$method_label)))
+    return(invisible(NULL))
+  }
+
+  x_name <- colnames(row_coordinates)[1]
+  y_name <- colnames(row_coordinates)[2]
+  phase_labels <- parse_phase_labels(rownames(row_coordinates))
+  coordinate_frame <- data.frame(
+    phase_labels,
+    label = paste(phase_labels$period, phase_labels$area, sep = "-"),
+    x = row_coordinates[, 1],
+    y = row_coordinates[, 2],
+    stringsAsFactors = FALSE
+  )
+  coordinate_frame <- coordinate_frame[
+    is.finite(coordinate_frame$x) & is.finite(coordinate_frame$y),
+    ,
+    drop = FALSE
+  ]
+  if (!nrow(coordinate_frame)) {
+    empty_plot_message("No finite ordination coordinates are available for the map.")
+    return(invisible(NULL))
+  }
+
+  period_levels <- present_period_levels(coordinate_frame$period, period_levels)
+  coordinate_frame$period <- factor(coordinate_frame$period, levels = period_levels, ordered = TRUE)
+  area_ids <- sort(unique(coordinate_frame$area))
+  area_keys <- paste("Area", area_ids)
+  area_colors <- palette.colors(max(length(area_ids), 1), "Pastel 1", recycle = TRUE)
+  names(area_colors) <- area_keys
+  coordinate_frame$legend_key <- paste("Area", coordinate_frame$area)
+
+  column_frame <- data.frame()
+  column_coordinates <- if (is.null(ordination_result$column_coordinates)) NULL else as.matrix(ordination_result$column_coordinates)
+  if (isTRUE(show_taxa_labels) && !is.null(column_coordinates) && nrow(column_coordinates) && ncol(column_coordinates) >= 2) {
+    column_labels <- rownames(column_coordinates)
+    if (is.null(column_labels)) {
+      column_labels <- paste("Taxon group", seq_len(nrow(column_coordinates)))
+    }
+    column_frame <- data.frame(
+      label = column_labels,
+      x = column_coordinates[, 1],
+      y = column_coordinates[, 2],
+      legend_key = "Taxon group",
+      stringsAsFactors = FALSE
+    )
+    column_frame <- column_frame[
+      is.finite(column_frame$x) & is.finite(column_frame$y),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  culture_frame <- data.frame()
+  culture_matrix <- if (is.null(culture_coordinates)) NULL else as.matrix(culture_coordinates)
+  if (isTRUE(show_culture_labels) && !is.null(culture_matrix) && nrow(culture_matrix) && ncol(culture_matrix) >= 2) {
+    culture_labels <- rownames(culture_matrix)
+    if (is.null(culture_labels)) {
+      culture_labels <- paste("Culture", seq_len(nrow(culture_matrix)))
+    }
+    culture_frame <- data.frame(
+      label = culture_labels,
+      x = culture_matrix[, 1],
+      y = culture_matrix[, 2],
+      legend_key = "Culture",
+      stringsAsFactors = FALSE
+    )
+    culture_frame <- culture_frame[
+      is.finite(culture_frame$x) & is.finite(culture_frame$y),
+      ,
+      drop = FALSE
+    ]
+  }
+
+  all_x <- c(coordinate_frame$x, column_frame$x, culture_frame$x)
+  all_y <- c(coordinate_frame$y, column_frame$y, culture_frame$y)
+  x_range <- range(all_x, na.rm = TRUE)
+  y_range <- range(all_y, na.rm = TRUE)
+  if (!all(is.finite(x_range)) || diff(x_range) == 0) {
+    x_range <- x_range + c(-1, 1)
+  }
+  if (!all(is.finite(y_range)) || diff(y_range) == 0) {
+    y_range <- y_range + c(-1, 1)
+  }
+  map_diagonal <- sqrt(diff(x_range)^2 + diff(y_range)^2)
+  arrow_shorten <- if (is.finite(map_diagonal) && map_diagonal > 0) map_diagonal * 0.016 else 0.03
+
+  arrow_frames <- lapply(area_ids, function(area_id) {
+    area_data <- coordinate_frame[coordinate_frame$area == area_id, , drop = FALSE]
+    area_data <- area_data[order(area_data$period), , drop = FALSE]
+    arrow_segments <- shorten_segments(as.matrix(area_data[, c("x", "y")]), arrow_shorten)
+    if (is.null(arrow_segments)) {
+      return(NULL)
+    }
+
+    data.frame(
+      arrow_segments,
+      legend_key = paste("Area", area_id),
+      stringsAsFactors = FALSE
+    )
+  })
+  arrow_frame <- do.call(rbind, arrow_frames[!vapply(arrow_frames, is.null, logical(1))])
+  if (is.null(arrow_frame)) {
+    arrow_frame <- data.frame()
+  }
+
+  label_frame <- rbind(
+    if (isTRUE(show_year_labels)) {
+      data.frame(
+        label = coordinate_frame$label,
+        x = coordinate_frame$x,
+        y = coordinate_frame$y,
+        legend_key = coordinate_frame$legend_key,
+        stringsAsFactors = FALSE
+      )
+    } else {
+      data.frame()
+    },
+    column_frame,
+    culture_frame
+  )
+  label_frame$label <- as.character(label_frame$label)
+  label_frame <- label_frame[nzchar(label_frame$label), , drop = FALSE]
+  label_frame$label_fill_key <- label_frame$legend_key
+
+  color_values <- area_colors
+  fill_values <- area_colors
+  legend_breaks <- area_keys
+  if (nrow(column_frame)) {
+    color_values <- c(color_values, "Taxon group" = "#111827")
+    fill_values <- c(fill_values, "Taxon group" = "#f8fafc")
+    legend_breaks <- c(legend_breaks, "Taxon group")
+  }
+  if (nrow(culture_frame)) {
+    color_values <- c(color_values, "Culture" = "#b45309")
+    fill_values <- c(fill_values, "Culture" = "#ffedd5")
+    legend_breaks <- c(legend_breaks, "Culture")
+  }
+
+  plot <- ggplot2::ggplot() +
+    ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "#cbd5e1", linewidth = 0.35) +
+    ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "#cbd5e1", linewidth = 0.35)
+
+  if (nrow(arrow_frame)) {
+    plot <- plot +
+      ggplot2::geom_segment(
+        data = arrow_frame,
+        ggplot2::aes(x = x0, y = y0, xend = x1, yend = y1, color = legend_key),
+        arrow = grid::arrow(type = "closed", length = grid::unit(0.11, "inches")),
+        lineend = "round",
+        linewidth = 0.8,
+        alpha = 0.88
+      )
+  }
+
+  if (isTRUE(show_year_labels)) {
+    plot <- plot +
+      ggplot2::geom_point(
+        data = coordinate_frame,
+        ggplot2::aes(x = x, y = y, color = legend_key),
+        shape = 16,
+        size = 2.8,
+        alpha = 0.95,
+        show.legend = FALSE
+      )
+  }
+
+  if (nrow(column_frame)) {
+    plot <- plot +
+      ggplot2::geom_point(
+        data = column_frame,
+        ggplot2::aes(x = x, y = y, color = legend_key),
+        shape = 4,
+        size = 2.2,
+        stroke = 0.8
+      )
+  }
+
+  if (nrow(culture_frame)) {
+    plot <- plot +
+      ggplot2::geom_point(
+        data = culture_frame,
+        ggplot2::aes(x = x, y = y, color = legend_key),
+        shape = 17,
+        size = 3.1
+      )
+  }
+
+  if (nrow(label_frame)) {
+    plot <- plot +
+      ggrepel::geom_label_repel(
+        data = label_frame,
+        ggplot2::aes(x = x, y = y, label = label, fill = label_fill_key),
+        color = "#111827",
+        label.size = 0.14,
+        label.padding = 0.14,
+        label.r = 0.06,
+        box.padding = 0.36,
+        point.padding = 0.20,
+        min.segment.length = 0,
+        max.overlaps = Inf,
+        max.iter = 30000,
+        max.time = 2.5,
+        force = 2.3,
+        force_pull = 0.16,
+        seed = 42,
+        segment.color = "#475569",
+        segment.alpha = 0.62,
+        segment.linetype = "dotted",
+        segment.size = 0.25,
+        size = 3.25,
+        show.legend = FALSE
+      )
+  }
+
+  plot <- plot +
+    ggplot2::scale_color_manual(
+      values = color_values,
+      breaks = legend_breaks,
+      name = NULL,
+      drop = FALSE
+    ) +
+    ggplot2::scale_fill_manual(
+      values = fill_values,
+      guide = "none",
+      drop = FALSE
+    ) +
+    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0.18, 0.30))) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.18, 0.28))) +
+    ggplot2::coord_cartesian(clip = "off") +
+    ggplot2::labs(x = x_name, y = y_name) +
+    ggplot2::guides(
+      color = ggplot2::guide_legend(
+        nrow = 2,
+        byrow = TRUE,
+        override.aes = list(size = 3, alpha = 1)
+      )
+    ) +
+    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme(
+      legend.position = "bottom",
+      legend.direction = "horizontal",
+      legend.box = "horizontal",
+      legend.key.height = grid::unit(0.16, "inches"),
+      legend.key.width = grid::unit(0.26, "inches"),
+      legend.text = ggplot2::element_text(size = 9),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.grid.major = ggplot2::element_line(color = "#e5e7eb", linewidth = 0.35),
+      axis.title = ggplot2::element_text(color = "#111827"),
+      axis.text = ggplot2::element_text(color = "#374151"),
+      plot.margin = ggplot2::margin(12, 18, 10, 12)
+    )
+
+  print(plot)
+  invisible(plot)
 }
 
 plotOrdinationDimensions <- function(ordination_result, period_levels = NULL) {

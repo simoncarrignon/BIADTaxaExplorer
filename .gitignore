@@ -1,2 +1,8 @@
 *.swp
 *.swo
+.Rhistory
+.RData
+.Rproj.user
+
+# Data cache written by R/data_store.R
+cache/

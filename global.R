@@ -1,27 +1,58 @@
-library(sf)
-library(shiny)
-library(bslib)
-library(leaflet)
-library(leaflet.extras)
-library(geojsonsf)
-library(DT)
+# BIAD Taxa Explorer v2 -------------------------------------------------------
+# Shared setup for the Shiny application.
 
-devtools::load_all("../BIADconnect/")
+suppressPackageStartupMessages({
+  library(shiny)
+  library(bslib)
+  library(leaflet)
+  library(leaflet.extras)
+  library(sf)
+  library(geojsonsf)
+  library(DT)
+  library(ggplot2)
+})
 
-source("R/tools.R")
-source("R/map_utils.R")
-source("R/analysis.R")
-source("R/get.faunal.taxa.R")
-source("R/get.botanical.taxa.R")
-source("R/plots.R")
-source("R/ui_components.R")
+options(
+  shiny.maxRequestSize = 64 * 1024^2,
+  shiny.sanitize.errors = FALSE
+)
 
-conn <- BIADconnect::init.conn()
+# BIADconnect lives next to this project in the COREX workspace. Prefer the
+# development copy so local changes are picked up, and fall back to the
+# installed package if the sibling directory is not available.
+if (dir.exists("../BIADconnect")) {
+  if (requireNamespace("devtools", quietly = TRUE)) {
+    suppressMessages(devtools::load_all("../BIADconnect/", quiet = TRUE))
+  } else if (requireNamespace("BIADconnect", quietly = TRUE)) {
+    library(BIADconnect)
+  }
+} else if (requireNamespace("BIADconnect", quietly = TRUE)) {
+  library(BIADconnect)
+}
 
-allFTaxa <- getFaunalTaxa(conn = conn)
-allBTaxa <- getABotTaxa(conn = conn)
+# Constants -------------------------------------------------------------------
+PHASE_SEPARATOR <- "||"
+DEFAULT_POLYGON_PATH <- "groupings/spatial/ss_three_polygons_230126.gpkg"
 
-faunalSites <- unique_site_points(allFTaxa)
-botanicalSites <- unique_site_points(allBTaxa)
+app_files <- c(
+  "R/cache.R",
+  "R/tools.R",
+  "R/data_store.R",
+  "R/map_utils.R",
+  "R/analysis.R",
+  "R/plots.R",
+  "R/ui_components.R",
+  "R/get.faunal.taxa.R",
+  "R/get.botanical.taxa.R"
+)
 
-areapal <- c("black", palette.colors(25, "Pastel 1", recycle = TRUE))
+for (app_file in app_files) {
+  if (!file.exists(app_file)) {
+    stop("Missing required application file: ", app_file)
+  }
+  source(app_file, local = FALSE)
+}
+
+# Shared area palette. The first colour is reserved for sites outside any
+# polygon so they always read as "unassigned" rather than a random area.
+areapal <- c("#0f172a", grDevices::palette.colors(25, "Pastel 1", recycle = TRUE))

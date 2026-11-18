@@ -1,47 +1,109 @@
-section_card <- function(title, subtitle = NULL, ..., step = NULL, class_name = NULL, header_right = NULL) {
-  div(
-    class = paste("card", class_name),
-    if (!is.null(step)) div(class = "step-label", step),
-    div(
-      class = "card-header-row",
-      div(
-        class = "card-header-main",
-        tags$h3(class = "card-title", title),
-        if (!is.null(subtitle)) tags$p(class = "helper-text", subtitle)
-      ),
-      if (!is.null(header_right)) div(class = "card-header-actions", header_right)
-    ),
-    ...
+# UI construction --------------------------------------------------------------
+
+app_theme <- function() {
+  bslib::bs_theme(
+    version = 5,
+    base_font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    heading_font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    bg = "#f4f4f2",
+    fg = "#1f2933",
+    primary = "#2f5d5a",
+    secondary = "#4b5563",
+    success = "#2f6b3f",
+    info = "#2f5d5a",
+    warning = "#8a5a12",
+    danger = "#9b2c2c",
+    border_radius = "0.25rem",
+    btn_border_radius = "0.25rem"
   )
 }
 
-metric_chip <- function(label, value) {
+# Small building blocks --------------------------------------------------------
+
+app_icon <- function(name) shiny::icon(name)
+
+status_pill <- function(text, tone = c("neutral", "fresh", "stale", "warning", "loading")) {
+  tone <- match.arg(tone)
   div(
-    class = "metric-chip",
+    class = paste("status-line", paste0("status-line--", tone)),
+    tags$span(class = "status-dot"),
+    tags$span(text)
+  )
+}
+
+metric_chip <- function(label, value, icon_name = NULL) {
+  div(
+    class = "metric",
     tags$span(class = "metric-label", label),
     tags$span(class = "metric-value", as.character(value))
   )
 }
 
 metrics_grid <- function(...) {
-  div(class = "metrics-grid", ...)
+  div(class = "stats-row", ...)
 }
 
-status_pill <- function(text, tone = c("neutral", "fresh", "stale", "warning")) {
-  tone <- match.arg(tone)
-  div(class = paste("status-pill", paste0("status-pill--", tone)), text)
+helper_text <- function(...) {
+  tags$p(class = "helper-text", ...)
 }
+
+empty_state <- function(title, body, icon_name = "circle-info") {
+  div(
+    class = "empty-state",
+    tags$h4(title),
+    tags$p(body)
+  )
+}
+
+panel_title <- function(text, icon_name = NULL) {
+  tags$div(class = "panel-title",
+    if (!is.null(icon_name)) app_icon(icon_name),
+    tags$span(text)
+  )
+}
+
+subsection_label <- function(text, help = NULL) {
+  tagList(
+    tags$div(class = "subsection-label", text),
+    if (!is.null(help)) tags$p(class = "subsection-help", help)
+  )
+}
+
+step_title <- function(number, title, hint_id) {
+  tags$div(
+    class = "step-head",
+    tags$span(class = "step-num", number),
+    tags$div(
+      class = "step-head-text",
+      tags$span(class = "step-title", title),
+      uiOutput(hint_id, inline = TRUE)
+    )
+  )
+}
+
+# Grouping and status summaries ------------------------------------------------
 
 build_group_summary_ui <- function(summary_stats) {
   groups <- summary_stats$groups
 
-  if (nrow(groups) == 0) {
+  if (is.null(groups) || nrow(groups) == 0) {
     return(
       div(
-        class = "group-summary",
-        tags$p(
-          class = "helper-text helper-text--compact",
-          "This grouping file does not map any taxa in the current dataset."
+        class = "group-preview",
+        tags$details(
+          class = "group-preview-details",
+          tags$summary(
+            class = "group-preview-summary",
+            tags$span(class = "group-preview-title", "Grouping preview"),
+            tags$span(class = "group-preview-meta", "no matches")
+          ),
+          div(
+            class = "group-preview-body",
+            tags$p(
+              class = "helper-text helper-text--compact",
+              "This grouping file does not map any taxa in the current dataset."
+            )
+          )
         )
       )
     )
@@ -89,18 +151,23 @@ build_group_summary_ui <- function(summary_stats) {
   }
 
   div(
-    class = "group-summary",
-    div(
-      class = "group-summary-header",
-      tags$span(class = "group-summary-title", "Grouping composition"),
-      tags$span(class = "group-summary-meta", paste(nrow(groups), "groups"))
-    ),
-    tags$p(
-      class = "group-summary-help",
-      "Click a taxa count to expand the exact taxa list."
-    ),
-    do.call(div, c(list(class = "group-summary-list"), group_items)),
-    note
+    class = "group-preview",
+    tags$details(
+      class = "group-preview-details",
+      tags$summary(
+        class = "group-preview-summary",
+        tags$span(class = "group-preview-title", "Grouping preview"),
+        tags$span(
+          class = "group-preview-meta",
+          sprintf("%s groups · %s unmatched", nrow(groups), summary_stats$unmatched)
+        )
+      ),
+      div(
+        class = "group-preview-body",
+        do.call(div, c(list(class = "group-summary-list"), group_items)),
+        note
+      )
+    )
   )
 }
 
@@ -111,24 +178,28 @@ build_selection_summary_ui <- function(
   polygon_count,
   grouping_label,
   stale,
-  has_results
+  has_results,
+  loading = FALSE,
+  site_count_label = NULL
 ) {
-  status <- if (polygon_count == 0) {
+  status <- if (loading) {
+    status_pill("Loading BIAD data ...", "loading")
+  } else if (polygon_count == 0) {
     status_pill("Add at least one polygon to define a study area.", "warning")
   } else if (has_results && stale) {
-    status_pill("Inputs changed — click Run analysis to refresh the charts.", "stale")
+    status_pill("Inputs changed — rerun the analysis to refresh the charts.", "stale")
   } else if (has_results) {
-    status_pill("Results are synced with the current map and controls.", "fresh")
+    status_pill("Results are in sync with the current map and controls.", "fresh")
   } else {
     status_pill("Ready to run once the study area looks right.", "neutral")
   }
 
   metrics <- metrics_grid(
-    metric_chip("Dataset", data_type),
-    metric_chip("Sites", format(site_count, big.mark = ",")),
-    metric_chip("Records", format(record_count, big.mark = ",")),
-    metric_chip("Polygons", polygon_count),
-    metric_chip("Grouping", grouping_label)
+    metric_chip("Dataset", data_type, "database"),
+    metric_chip("Sites", site_count_label %||% format(site_count, big.mark = ","), "location-dot"),
+    metric_chip("Records", format(record_count, big.mark = ","), "layer-group"),
+    metric_chip("Polygons", polygon_count, "draw-polygon"),
+    metric_chip("Grouping", grouping_label, "sitemap")
   )
 
   div(class = "summary-block", status, metrics)
@@ -140,9 +211,9 @@ build_analysis_status_ui <- function(result, stale) {
       div(
         class = "summary-block",
         status_pill("No analysis has been run yet.", "neutral"),
-        tags$p(
-          class = "helper-text",
-          "Choose a dataset, define polygons, select an analysis type, and click Run analysis to compute the ordination."
+        helper_text(
+          "Choose a dataset, define polygons, select an analysis method, ",
+          "then click Run analysis to compute the ordination."
         )
       )
     )
@@ -155,391 +226,390 @@ build_analysis_status_ui <- function(result, stale) {
   }
 
   metrics <- metrics_grid(
-    metric_chip("Method", result$summary$analysis_method),
-    metric_chip("Used polygons", result$summary$polygon_count),
-    metric_chip("Phases", result$summary$phase_count),
-    metric_chip("Taxon groups", result$summary$taxon_group_count),
-    metric_chip("Records analysed", format(result$summary$records, big.mark = ","))
+    metric_chip("Method", result$summary$analysis_method, "chart-line"),
+    metric_chip("Used polygons", result$summary$polygon_count, "draw-polygon"),
+    metric_chip("Phases", result$summary$phase_count, "clock"),
+    metric_chip("Taxon groups", result$summary$taxon_group_count, "tags"),
+    metric_chip("Records analysed", format(result$summary$records, big.mark = ","), "list-check")
   )
 
   notes <- NULL
   if (length(result$notes) > 0) {
     notes <- do.call(
       tags$ul,
-      c(
-        list(class = "note-list"),
-        lapply(result$notes, tags$li)
-      )
+      c(list(class = "note-list"), lapply(result$notes, tags$li))
     )
   }
 
   div(class = "summary-block", status, metrics, notes)
 }
 
+build_overview_ui <- function(result, stale) {
+  if (is.null(result)) {
+    return(empty_state(
+      "No results yet",
+      "Run an analysis to see a summary of the ordination, notes, and export contents.",
+      "flask"
+    ))
+  }
+
+  div(
+    class = "overview-stack",
+    build_analysis_status_ui(result, stale),
+    div(
+      class = "overview-note",
+      tags$strong("Reading the ordination"),
+      tags$p(
+        "Points are phase × polygon combinations. Arrows connect phases in time ",
+        "order inside each polygon, so arrow direction shows how composition ",
+        "changes through time. Use the Ordination tab to toggle year, taxon, and ",
+        "culture labels."
+      )
+    )
+  )
+}
+
+# Main UI ----------------------------------------------------------------------
+
 app_ui <- function() {
+  faunal_groupings <- available_groupings("Faunal")
+  faunal_default <- preferred_grouping_path("Faunal")
+
+  # The non-Combined selector initially shows the Faunal schemes. The server
+  # swaps the choices when the dataset selector changes.
   bslib::page_fluid(
     title = "BIAD Taxa Explorer",
-    theme = bslib::bs_theme(
-      version = 5,
-      base_font = bslib::font_google("Inter"),
-      bg = "#eef3f8",
-      fg = "#142133",
-      primary = "#1976D2",
-      secondary = "#111827",
-      success = "#2e7d32",
-      info = "#1976D2",
-      warning = "#f59e0b",
-      border_radius = "0.35rem",
-      btn_border_radius = "0.25rem"
-    ),
+    theme = app_theme(),
     tags$head(
-      tags$link(rel = "stylesheet", type = "text/css", href = "app.css")
+      tags$link(rel = "stylesheet", type = "text/css", href = "app.css"),
+      tags$link(rel = "icon", type = "image/png", href = "biad.logo.png"),
+      tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+      tags$meta(name = "color-scheme", content = "light")
     ),
     div(
-      class = "page-wrap",
-      div(
-        class = "hero",
+      class = "app-shell",
+
+      # Header ----------------------------------------------------------------
+      tags$header(
+        class = "app-header",
         div(
-          class = "hero-brand",
+          class = "app-header-brand",
           tags$a(
             href = "https://biadwiki.org",
             target = "_blank",
             rel = "noopener noreferrer",
-            class = "hero-logo-link",
-            tags$img(
-              src = "biad.logo.png",
-              alt = "BIAD logo",
-              class = "hero-logo"
-            )
+            class = "brand-logo-link",
+            tags$img(src = "biad.logo.png", alt = "BIAD logo", class = "brand-logo")
           ),
           div(
-            class = "hero-copy",
+            class = "brand-text",
             tags$h1("BIAD Taxa Explorer"),
             tags$p(
-              "Select a dataset, define study areas, group taxa, and compare spatial-temporal patterns with correspondence analysis or principal component analysis."
-            ),
-            div(
-              class = "warning-banner",
-              "Experimental internal interface for research and testing."
-            )
-          )
-        )
-      ),
-      fluidRow(
-        column(
-          width = 4,
-          div(
-            class = "app-sidebar-shell",
-            div(
-              class = "sticky-column",
-              section_card(
-                title = "Data and study areas",
-                subtitle = "Choose the dataset, taxon grouping, and polygons to analyse.",
-                step = "Step 1",
-                class_name = "sidebar-card",
-                div(
-                  class = "sidebar-subsection",
-                  selectInput(
-                    "data_type_selector",
-                    "Dataset",
-                    choices = c("Faunal", "Botanical", "Combined"),
-                    selected = "Faunal"
-                  ),
-                  conditionalPanel(
-                    condition = "input.data_type_selector != 'Combined'",
-                    selectInput("file_selector_tx", "Taxon grouping", choices = character(0)),
-                    tags$details(
-                      style = "margin-top: 4px; font-size: 11px;",
-                      tags$summary(
-                        style = "color: #999; cursor: pointer; user-select: none;",
-                        "group file options"
-                      ),
-                      div(
-                        style = "margin-top: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;",
-                        div(
-                          style = "display: flex; gap: 8px;",
-                          downloadButton("download_group", "↓ download",
-                            style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
-                          ),
-                          actionButton("edit_group", "✎ edit labels",
-                            style = "font-size: 11px; padding: 2px 8px; height: auto; color: #555; background: #fff; border: 1px solid #ccc;"
-                          )
-                        )
-                      )
-                    )
-                  ),
-                  conditionalPanel(
-                    condition = "input.data_type_selector == 'Combined'",
-                    selectInput(
-                      "file_selector_tx_combined_faunal",
-                      "Faunal grouping",
-                      choices = character(0)
-                    ),
-                    uiOutput("combined_botanical_groups_ui"),
-                    tags$p(
-                      class = "helper-text helper-text--compact",
-                      "Combined mode keeps all faunal groups from the chosen faunal scheme and lets you mix botanical subgroups from any botanical grouping file."
-                    ),
-                    tags$p(
-                      class = "helper-text helper-text--compact",
-                      "If selected botanical subgroups reuse the same taxa codes, the app will warn that those botanical counts are duplicated across the selected subgroups."
-                    )
-                  ),
-                  uiOutput("taxon_table"),
-                  conditionalPanel(
-                    condition = "input.data_type_selector != 'Combined'",
-                    tags$details(
-                      style = "margin-top: 4px; font-size: 11px;",
-                      tags$summary(
-                        style = "color: #999; cursor: pointer; user-select: none;",
-                        "upload new grouping file"
-                      ),
-                      div(
-                        style = "margin-top: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;",
-                        fileInput("upload_group", NULL,
-                          accept = ".csv",
-                          buttonLabel = "Upload .csv",
-                          placeholder = "no file selected",
-                          width = "100%"
-                        ),
-                          downloadButton("download_template", "↓ template",
-                            style = "font-size: 11px; padding: 2px 8px; height: auto; color: #888; background: #fff; border: 1px dashed #ccc;"
-                          )
-                      )
-                    )
-                  )
-                ),
-                div(
-                  class = "sidebar-subsection sidebar-action-surface",
-                  tags$div(class = "sidebar-subsection-title", "Study area polygons"),
-                  tags$p(
-                    class = "sidebar-subsection-help",
-                    "Upload a GeoPackage here, or draw polygons directly on the map."
-                  ),
-                  fileInput("shapefile", "Upload polygons (.gpkg)", accept = ".gpkg"),
-                  actionButton(
-                    "clear_polygons_btn",
-                    "Clear polygons",
-                    class = "btn-default btn-block sidebar-secondary-btn sidebar-danger-btn"
-                  )
-                )
-              ),
-              section_card(
-                title = "Time controls",
-                subtitle = "Pick predefined archaeological periods or build fixed BP slices.",
-                step = "Step 2",
-                class_name = "sidebar-card",
-                div(
-                  class = "sidebar-subsection",
-                  selectInput(
-                    "file_selector_per",
-                    "Period grouping",
-                    choices = c(
-                      "Automatic time slices" = "auto",
-                      "Named archaeological periods" = "groupings/periods/periods.csv"
-                    ),
-                    selected = "auto"
-                  )
-                ),
-                conditionalPanel(
-                  condition = "input.file_selector_per == 'auto'",
-                  div(
-                    class = "sidebar-subsection sidebar-time-surface",
-                    div(
-                      class = "time-controls-panel",
-                      div(
-                        class = "time-boundary-grid",
-                        div(
-                          class = "time-boundary-field",
-                          numericInput("start_value", "Start (BP)", value = 8500, min = 0, width = "100%")
-                        ),
-                        div(
-                          class = "time-boundary-field",
-                          numericInput("end_value", "End (BP)", value = 3000, min = 0, width = "100%")
-                        )
-                      ),
-                      div(
-                        class = "slider-panel slider-panel--highlight",
-                        div(
-                          class = "slider-panel-heading",
-                          tags$div(class = "slider-panel-label", "Time-slice width"),
-                          tags$p(
-                            class = "slider-panel-help",
-                            "Move the slider to choose the width of each BP slice."
-                          )
-                        ),
-                        sliderInput(
-                          "duration",
-                          NULL,
-                          min = 100,
-                          max = 1000,
-                          value = 500,
-                          step = 50,
-                          width = "100%"
-                        )
-                      )
-                    )
-                  )
-                )
-              ),
-              section_card(
-                title = "Type of analysis",
-                subtitle = "Choose the ordination method and, for PCA, the input transform and scaling.",
-                step = "Step 3",
-                class_name = "sidebar-card",
-                div(
-                  class = "sidebar-subsection",
-                  selectInput(
-                    "analysis_method",
-                    "Ordination method",
-                    choices = c(
-                      "Correspondence analysis" = "ca",
-                      "Principal component analysis" = "pca"
-                    ),
-                    selected = "ca"
-                  )
-                ),
-                conditionalPanel(
-                  condition = "input.analysis_method == 'pca'",
-                  div(
-                    class = "sidebar-subsection sidebar-time-surface",
-                    selectInput(
-                      "pca_transform",
-                      "PCA input matrix",
-                      choices = c(
-                        "log(count + 1)" = "log1p",
-                        "Raw counts" = "raw"
-                      ),
-                      selected = "log1p"
-                    ),
-                    selectInput(
-                      "pca_scaling",
-                      "PCA column scaling",
-                      choices = c(
-                        "Center + scale" = "scale",
-                        "Center only" = "center",
-                        "No centering or scaling" = "none"
-                      ),
-                      selected = "scale"
-                    ),
-                    tags$p(
-                      class = "sidebar-subsection-help",
-                      "The selected transform is applied first, then PCA uses centered-and-scaled, centered-only, or uncentered columns."
-                    )
-                  )
-                )
-              ),
-              section_card(
-                title = "Run analysis",
-                subtitle = "Analysis only reruns when you ask for it, so the interface stays responsive.",
-                step = "Step 4",
-                class_name = "sidebar-card sidebar-actions-card",
-                div(
-                  class = "control-actions",
-                  div(
-                    class = "sidebar-subsection sidebar-run-surface",
-                    tags$div(class = "sidebar-subsection-title", "Run analysis"),
-                    tags$p(
-                      class = "sidebar-subsection-help",
-                      "Charts and tables refresh only when you click Run analysis."
-                    ),
-                    actionButton(
-                      "run_btn",
-                      "Run analysis",
-                      class = "btn-primary btn-lg btn-block sidebar-primary-btn"
-                    )
-                  )
-                )
-              )
+              "Faunal and botanical taxa in custom study areas, grouped through ",
+              "published schemes and compared with CA or PCA."
             )
           )
         ),
-        column(
-          width = 8,
+        div(
+          class = "app-header-actions",
+          actionButton(
+            "refresh_data",
+            tagList(app_icon("arrows-rotate"), "Refresh data"),
+            class = "btn btn-sm btn-outline-secondary"
+          ),
+          actionButton(
+            "reset_app",
+            tagList(app_icon("rotate-left"), "Reset"),
+            class = "btn btn-sm btn-outline-secondary"
+          )
+        )
+      ),
+
+      uiOutput("data_status"),
+
+      bslib::layout_columns(
+        col_widths = c(4, 8),
+        gap = "1.1rem",
+
+        # Sidebar -------------------------------------------------------------
+        div(
+          class = "sidebar-stack",
           div(
-            class = "app-main-shell",
-            section_card(
-              title = "Map and coverage",
-              subtitle = "Draw one or more polygons directly on the map or upload a GeoPackage.",
-              header_right = uiOutput("map_exports"),
-              uiOutput("selection_summary"),
-              leafletOutput("map", height = "62vh")
-            ),
-            section_card(
-              title = "Analysis results",
-              div(
-                class = "results-tabs",
-                tabsetPanel(
-                  id = "results_tabs",
-                  tabPanel(
-                    "Raw counts",
-                    plotOutput("plot1", height = "320px"),
-                    tags$p(
-                      class = "plot-caption",
-                      "Total counts per period for each selected polygon."
-                    )
-                  ),
-                  tabPanel(
-                    "Composition",
-                    plotOutput("plot2_legend", height = "150px"),
-                    plotOutput("plot2", height = "340px"),
-                    tags$p(
-                      class = "plot-caption",
-                      "Relative share of taxon groups across periods within each polygon."
-                    ),
-                    plotOutput("plot2_culture", height = "420px"),
-                    tags$p(
-                      class = "plot-caption",
-                      "Relative share of taxon groups within each culture, aggregated across time bins, phases, and selected polygons."
-                    )
-                  ),
-                  tabPanel(
-                    "Ordination map",
-                    div(
-                      class = "ordination-label-controls",
-                      checkboxInput("plot_label_year", "Year", FALSE),
-                      checkboxInput("plot_label_taxa", "Taxa", FALSE),
-                      checkboxInput("plot_label_culture", "Culture", FALSE)
-                    ),
-                    uiOutput("plot_culture_limit_ui"),
-                    div(
-                      class = "ordination-plot-shell",
-                      plotOutput("plot3", height = "680px")
-                    ),
-                    tags$p(
-                      class = "plot-caption",
-                      "Ordination map with arrows that track phase order inside each polygon."
-                    )
-                  ),
-                  tabPanel(
-                    "Dimensions",
-                    plotOutput("plot4", height = "520px"),
-                    tags$p(
-                      class = "plot-caption",
-                      "How the first two ordination dimensions evolve across time for each polygon."
-                    ),
-                    plotOutput("plot4_diag", height = "280px"),
-                    tags$p(
-                      class = "plot-caption",
-                      "Diagnostic view of variance explained for PCA or inertia explained for CA."
-                    )
-                  ),
-                  tabPanel(
-                    "Data preview",
-                    tableOutput("analysis_preview"),
-                    tags$p(
-                      class = "plot-caption",
-                      "Preview of the exported aggregated table."
-                    )
-                  )
+            class = "sidebar-panel",
+          bslib::accordion(
+            id = "workflow_accordion",
+            open = c("panel-data", "panel-time"),
+            multiple = TRUE,
+            bslib::accordion_panel(
+              title = step_title("1", "Data and study area", "step1_hint"),
+              value = "panel-data",
+              selectInput(
+                "data_type_selector",
+                "Dataset",
+                choices = c("Faunal" = "Faunal", "Botanical" = "Botanical", "Combined" = "Combined"),
+                selected = "Faunal",
+                width = "100%"
+              ),
+              conditionalPanel(
+                condition = "input.data_type_selector != 'Combined'",
+                selectInput(
+                  "file_selector_tx",
+                  "Taxon grouping",
+                  choices = faunal_groupings,
+                  selected = faunal_default,
+                  width = "100%"
                 )
               ),
-              tags$p(
-                class = "plot-caption",
-                "Compare raw counts, taxon composition, and correspondence-analysis structure."
+              conditionalPanel(
+                condition = "input.data_type_selector == 'Combined'",
+                selectInput(
+                  "file_selector_tx_combined_faunal",
+                  "Faunal grouping",
+                  choices = faunal_groupings,
+                  selected = faunal_default,
+                  width = "100%"
+                ),
+                uiOutput("combined_botanical_groups_ui"),
+                helper_text(
+                  "Faunal groups are kept and the chosen botanical subgroups are added. ",
+                  "Taxa used by several subgroups are counted in each and flagged after the analysis."
+                )
               ),
-              uiOutput("analysis_status")
+              div(class = "sidebar-divider"),
+              subsection_label(
+                "Study area",
+                "Upload a GeoPackage or draw polygons directly on the map."
+              ),
+              fileInput(
+                "shapefile",
+                NULL,
+                accept = c(".gpkg", ".geojson", ".json"),
+                buttonLabel = tagList(app_icon("upload"), "Upload GeoPackage"),
+                placeholder = "No file selected",
+                width = "100%"
+              ),
+              div(
+                class = "button-row",
+                actionButton(
+                  "clear_polygons_btn",
+                  tagList(app_icon("trash"), "Clear polygons"),
+                  class = "btn-sm btn-danger-soft"
+                )
+              ),
+              uiOutput("taxon_table"),
+              tags$details(
+                class = "manage-details",
+                tags$summary("Manage grouping files"),
+                div(
+                  class = "manage-body",
+                  fileInput(
+                    "upload_group",
+                    NULL,
+                    accept = ".csv",
+                    buttonLabel = tagList(app_icon("upload"), "Upload CSV"),
+                    placeholder = "No file selected",
+                    width = "100%"
+                  ),
+                  div(
+                    class = "manage-actions",
+                    downloadButton("download_group", tagList(app_icon("download"), "Download"), class = "btn-sm btn-soft"),
+                    actionButton("edit_group", tagList(app_icon("pen"), "Edit labels"), class = "btn-sm btn-soft"),
+                    downloadButton("download_template", tagList(app_icon("file-lines"), "Template"), class = "btn-sm btn-soft")
+                  ),
+                  helper_text("Format: group number, group label, taxa codes separated by +.")
+                )
+              )
+            ),
+            bslib::accordion_panel(
+              title = step_title("2", "Time window", "step2_hint"),
+              value = "panel-time",
+              helper_text("Use the named archaeological periods or build fixed BP slices."),
+              selectInput(
+                "file_selector_per",
+                "Period grouping",
+                choices = c(
+                  "Automatic BP slices" = "auto",
+                  "Named archaeological periods" = "groupings/periods/periods.csv"
+                ),
+                selected = "auto",
+                width = "100%"
+              ),
+              conditionalPanel(
+                condition = "input.file_selector_per == 'auto'",
+                selectInput(
+                  "time_preset",
+                  "Quick range",
+                  choices = c(
+                    "Custom" = "custom",
+                    "8500–3000 BP · 500 yr" = "8500_3000_500",
+                    "6000–2000 BP · 500 yr" = "6000_2000_500",
+                    "4000–0 BP · 250 yr" = "4000_0_250"
+                  ),
+                  selected = "custom",
+                  width = "100%"
+                ),
+                div(
+                  class = "field-grid",
+                  numericInput("start_value", "Start (BP)", value = 8500, min = 0, width = "100%"),
+                  numericInput("end_value", "End (BP)", value = 3000, min = 0, width = "100%")
+                ),
+                sliderInput(
+                  "duration",
+                  "Time-slice width (years)",
+                  min = 100,
+                  max = 1000,
+                  value = 500,
+                  step = 50,
+                  width = "100%"
+                ),
+                uiOutput("time_validation")
+              )
+            ),
+            bslib::accordion_panel(
+              title = step_title("3", "Analysis settings", "step3_hint"),
+              value = "panel-analysis",
+              selectInput(
+                "analysis_method",
+                "Ordination method",
+                choices = c(
+                  "Correspondence analysis (CA)" = "ca",
+                  "Principal component analysis (PCA)" = "pca"
+                ),
+                selected = "ca",
+                width = "100%"
+              ),
+              conditionalPanel(
+                condition = "input.analysis_method == 'pca'",
+                selectInput(
+                  "pca_transform",
+                  "PCA input matrix",
+                  choices = c("log(count + 1)" = "log1p", "Raw counts" = "raw"),
+                  selected = "log1p",
+                  width = "100%"
+                ),
+                selectInput(
+                  "pca_scaling",
+                  "PCA column scaling",
+                  choices = c(
+                    "Center + scale" = "scale",
+                    "Center only" = "center",
+                    "No centering or scaling" = "none"
+                  ),
+                  selected = "scale",
+                  width = "100%"
+                )
+              ),
+              uiOutput("method_note")
             )
+          ),
+
+          div(
+            class = "run-section",
+            step_title("4", "Run analysis", "step4_hint"),
+            tags$p(class = "run-section-help", "Charts refresh only when you click the button."),
+            actionButton(
+              "run_btn",
+              tagList(app_icon("play"), "Run analysis"),
+              class = "btn-primary btn-block btn-run"
+            ),
+            uiOutput("run_hint")
+          )
+          )
+        ),
+
+        # Main ----------------------------------------------------------------
+        div(
+          class = "main-stack",
+          bslib::card(
+            class = "app-card map-card",
+            bslib::card_header(
+              class = "app-card-header",
+              div(
+                class = "app-card-title-wrap",
+                div(
+                  tags$h3(class = "app-card-title", "Map and coverage"),
+                  tags$p(class = "app-card-subtitle", "Draw or upload polygons to define the study area.")
+                )
+              ),
+              div(class = "app-card-actions", uiOutput("map_exports"))
+            ),
+            bslib::card_body(
+              class = "app-card-body",
+              uiOutput("selection_summary"),
+              div(
+                class = "map-toolbar",
+                actionButton("zoom_to_data", tagList(app_icon("magnifying-glass-plus"), "Zoom to data"), class = "btn-sm btn-soft"),
+                actionButton("undo_polygon_btn", tagList(app_icon("rotate-left"), "Undo polygon"), class = "btn-sm btn-soft"),
+                div(
+                  class = "map-toggle",
+                  checkboxInput("only_selected_sites", "Only sites in study areas", FALSE)
+                )
+              ),
+              shinycssloaders::withSpinner(
+                leafletOutput("map", height = "60vh"),
+                type = 8,
+                color = "#2f5d5a",
+                size = 0.7
+              )
+            )
+          ),
+
+          div(
+            class = "results-wrap",
+            bslib::navset_card_tab(
+              id = "results_tabs",
+              title = "Analysis results",
+              full_screen = TRUE,
+              bslib::nav_panel(
+                "Overview",
+                uiOutput("analysis_overview")
+              ),
+              bslib::nav_panel(
+                "Raw counts",
+                shinycssloaders::withSpinner(plotOutput("plot1", height = "360px"), type = 8, color = "#2f5d5a", size = 0.7),
+                tags$p(class = "plot-caption", "Total counts per period for each selected polygon.")
+              ),
+              bslib::nav_panel(
+                "Composition",
+                shinycssloaders::withSpinner(plotOutput("plot2_legend", height = "150px"), type = 8, color = "#2f5d5a", size = 0.6),
+                shinycssloaders::withSpinner(plotOutput("plot2", height = "360px"), type = 8, color = "#2f5d5a", size = 0.7),
+                tags$p(class = "plot-caption", "Relative share of taxon groups across periods within each polygon."),
+                uiOutput("plot_culture_composition_limit_ui"),
+                shinycssloaders::withSpinner(plotOutput("plot2_culture", height = "430px"), type = 8, color = "#2f5d5a", size = 0.7),
+                tags$p(class = "plot-caption", "Relative share of taxon groups within each culture, aggregated across the current selection.")
+              ),
+              bslib::nav_panel(
+                "Ordination",
+                div(
+                  class = "label-controls",
+                  checkboxInput("plot_label_year", "Year labels", FALSE),
+                  checkboxInput("plot_label_taxa", "Taxon labels", FALSE),
+                  checkboxInput("plot_label_culture", "Culture labels", FALSE)
+                ),
+                uiOutput("plot_culture_limit_ui"),
+                shinycssloaders::withSpinner(plotOutput("plot3", height = "680px"), type = 8, color = "#2f5d5a", size = 0.7),
+                tags$p(class = "plot-caption", "Arrows follow phase order inside each polygon.")
+              ),
+              bslib::nav_panel(
+                "Diagnostics",
+                shinycssloaders::withSpinner(plotOutput("plot4", height = "520px"), type = 8, color = "#2f5d5a", size = 0.7),
+                tags$p(class = "plot-caption", "How the first two ordination dimensions evolve through time for each polygon."),
+                shinycssloaders::withSpinner(plotOutput("plot4_diag", height = "300px"), type = 8, color = "#2f5d5a", size = 0.6),
+                tags$p(class = "plot-caption", "Variance explained (PCA) or inertia explained (CA) per dimension.")
+              ),
+              bslib::nav_panel(
+                "Data preview",
+                DT::DTOutput("analysis_preview"),
+                tags$p(class = "plot-caption", "Preview of the aggregated export table.")
+              )
+            )
+          ),
+
+          tags$footer(
+            class = "app-footer",
+            tags$span("BIAD Taxa Explorer"),
+            tags$span(class = "footer-dot", "·"),
+            tags$span("Internal research tool")
           )
         )
       )

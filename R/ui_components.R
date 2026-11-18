@@ -255,17 +255,7 @@ build_overview_ui <- function(result, stale) {
 
   div(
     class = "overview-stack",
-    build_analysis_status_ui(result, stale),
-    div(
-      class = "overview-note",
-      tags$strong("Reading the ordination"),
-      tags$p(
-        "Points are phase × polygon combinations. Arrows connect phases in time ",
-        "order inside each polygon, so arrow direction shows how composition ",
-        "changes through time. Use the Ordination tab to toggle year, taxon, and ",
-        "culture labels."
-      )
-    )
+    build_analysis_status_ui(result, stale)
   )
 }
 
@@ -613,15 +603,22 @@ app_ui <- function() {
                   checkboxInput("plot_label_culture", "Culture labels", FALSE)
                 ),
                 uiOutput("plot_culture_limit_ui"),
+                div(
+                  class = "overview-note",
+                  tags$strong("Reading the ordination"),
+                  tags$p(
+                    "Points are phase × polygon combinations. Arrows connect phases in time ",
+                    "order inside each polygon, so arrow direction shows how composition ",
+                    "changes through time. Use the controls above to toggle year, taxon, and ",
+                    "culture labels."
+                  )
+                ),
                 shinycssloaders::withSpinner(plotOutput("plot3", height = "680px"), type = 8, color = "#2f5d5a", size = 0.7),
-                tags$p(class = "plot-caption", "Arrows follow phase order inside each polygon.")
-              ),
-              bslib::nav_panel(
-                "Diagnostics",
-                shinycssloaders::withSpinner(plotOutput("plot4", height = "520px"), type = 8, color = "#2f5d5a", size = 0.7),
-                tags$p(class = "plot-caption", "How the first two ordination dimensions evolve through time for each polygon."),
+                tags$p(class = "plot-caption", "Arrows follow phase order inside each polygon."),
                 shinycssloaders::withSpinner(plotOutput("plot4_diag", height = "300px"), type = 8, color = "#2f5d5a", size = 0.6),
-                tags$p(class = "plot-caption", "Variance explained (PCA) or inertia explained (CA) per dimension.")
+                tags$p(class = "plot-caption", "Variance explained (PCA) or inertia explained (CA) per dimension."),
+                shinycssloaders::withSpinner(plotOutput("plot4", height = "520px"), type = 8, color = "#2f5d5a", size = 0.7),
+                tags$p(class = "plot-caption", "How the first two ordination dimensions evolve through time for each polygon.")
               ),
               bslib::nav_panel(
                 "Data preview",

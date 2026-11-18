@@ -1,35 +1,235 @@
-split_plus <- function(list_taxa) {
-  if (is.na(list_taxa) || !nzchar(list_taxa)) {
-    return(character(0))
-  }
+# Grouping files, taxon mapping, and dataset helpers ---------------------------
 
-  trimws(strsplit(list_taxa, "\\+")[[1]])
+# Parsing ---------------------------------------------------------------------
+
+split_plus <- function(text) {
+  if (length(text) == 0) return(character(0))
+  text <- text[[1]]
+  if (is.na(text) || !nzchar(trimws(text))) return(character(0))
+  codes <- trimws(strsplit(as.character(text), "\\+")[[1]])
+  codes[nzchar(codes) & codes != "\\N"]
 }
 
-read_taxon_grouping <- function(filename) {
-  grouping_data <- read.csv(
+# Grouping files are a small CSV dialect: any number of free-text preamble rows
+# (title, notes), followed by rows whose first column is a group number. Only
+# rows with a numeric first column are treated as group definitions, which keeps
+# site lists and other CSVs from silently becoming "groupings".
+parse_grouping_file <- function(filename) {
+  if (is.null(filename) || !length(filename) || !file.exists(filename)) {
+    return(list())
+  }
+
+  raw <- utils::read.csv(
     filename,
-    skip = 1,
-    header = FALSE
+    header = FALSE,
+    fill = TRUE,
+    stringsAsFactors = FALSE,
+    check.names = FALSE
   )
-  grouping_data <- grouping_data[!is.na(grouping_data[, 1]), , drop = FALSE]
 
-  group_labels <- trimws(gsub("=", "", grouping_data[, 2]))
-  taxa_lists <- lapply(grouping_data[, 3], split_plus)
-  names(taxa_lists) <- group_labels
+  if (!ncol(raw) || !nrow(raw) || ncol(raw) < 3) {
+    return(list())
+  }
 
+  first_col <- trimws(as.character(raw[[1]]))
+  is_group <- grepl("^[0-9]+[.)]?$", first_col)
+  group_rows <- raw[is_group, , drop = FALSE]
+  if (!nrow(group_rows)) {
+    return(list())
+  }
+
+  labels <- trimws(gsub("=", "", as.character(group_rows[[2]])))
+  taxa_text <- as.character(group_rows[[3]])
+  keep <- nzchar(labels) & !is.na(taxa_text)
+  labels <- labels[keep]
+  taxa_text <- taxa_text[keep]
+  if (!length(labels)) {
+    return(list())
+  }
+
+  taxa_lists <- lapply(taxa_text, split_plus)
+  names(taxa_lists) <- make.unique(labels, sep = " ")
   taxa_lists
 }
 
+read_taxon_grouping <- function(filename) {
+  parse_grouping_file(filename)
+}
+
+is_valid_grouping_file <- function(path) {
+  tryCatch({
+    definition <- parse_grouping_file(path)
+    length(definition) > 0 && any(lengths(definition) > 0)
+  }, error = function(e) FALSE)
+}
+
+# Ordering --------------------------------------------------------------------
+
+roman_to_integer <- function(prefix) {
+  prefix <- toupper(gsub("[^IVXLCDM]", "", prefix))
+  if (!nzchar(prefix)) return(NA_integer_)
+
+  values <- c(I = 1L, V = 5L, X = 10L, L = 50L, C = 100L, D = 500L, M = 1000L)
+  digits <- values[strsplit(prefix, "")[[1]]]
+  if (any(is.na(digits))) return(NA_integer_)
+
+  total <- 0L
+  index <- 1L
+  while (index <= length(digits)) {
+    if (index < length(digits) && digits[[index]] < digits[[index + 1L]]) {
+      total <- total + digits[[index + 1L]] - digits[[index]]
+      index <- index + 2L
+    } else {
+      total <- total + digits[[index]]
+      index <- index + 1L
+    }
+  }
+  total
+}
+
+grouping_sort_key <- function(labels) {
+  prefix <- regmatches(labels, regexpr("^[IVXLCDM]+(?=\\s)", labels, perl = TRUE))
+  key <- rep(NA_integer_, length(labels))
+  has_prefix <- nzchar(prefix)
+  key[has_prefix] <- vapply(prefix[has_prefix], roman_to_integer, integer(1))
+  key
+}
+
+format_grouping_label <- function(path) {
+  label <- tools::file_path_sans_ext(basename(path))
+  label <- gsub("^group_", "Group ", label)
+  gsub("_", " ", label)
+}
+
+# File discovery --------------------------------------------------------------
+
+grouping_directory <- function(data_type = "Faunal") {
+  if (identical(data_type, "Botanical")) {
+    "groupings/botanical_taxa"
+  } else {
+    "groupings/faunal_taxa"
+  }
+}
+
+grouping_signature <- function(directory) {
+  files <- list.files(directory, pattern = "\\.csv$", ignore.case = TRUE, full.names = TRUE)
+  if (!length(files)) return("empty")
+  info <- file.info(files)
+  paste(basename(files), as.numeric(info$mtime), info$size, collapse = "|")
+}
+
+available_groupings <- function(data_type = "Faunal", force = FALSE) {
+  directory <- grouping_directory(data_type)
+  signature <- grouping_signature(directory)
+  key <- paste0("available_groupings::", data_type)
+  cached <- cache_get(key)
+
+  if (!force && !is.null(cached) && identical(cached$signature, signature)) {
+    return(cached$value)
+  }
+
+  files <- sort(list.files(
+    directory,
+    pattern = "\\.csv$",
+    ignore.case = TRUE,
+    full.names = TRUE
+  ))
+  files <- files[vapply(files, is_valid_grouping_file, logical(1))]
+
+  labels <- vapply(files, format_grouping_label, character(1))
+  key_values <- grouping_sort_key(labels)
+  ordering <- order(is.na(key_values), key_values, labels)
+
+  value <- stats::setNames(files[ordering], labels[ordering])
+  cache_set(key, list(signature = signature, value = value))
+  value
+}
+
+invalidate_grouping_cache <- function() {
+  cache_clear("^available_groupings::")
+  cache_clear("^group_catalog::")
+  invisible(NULL)
+}
+
+# A grouping with only two groups yields a one-dimensional CA, so the default
+# favours a richer scheme where one is available.
+preferred_grouping_path <- function(data_type = "Faunal") {
+  choices <- available_groupings(data_type)
+  if (!length(choices)) return(NULL)
+
+  preferred_prefix <- if (identical(data_type, "Botanical")) "^I " else "^VIII "
+  hit <- grep(preferred_prefix, names(choices))
+  if (length(hit)) unname(choices)[[hit[[1]]]] else unname(choices)[[1]]
+}
+
+# Group catalog ---------------------------------------------------------------
+
+group_catalog <- function(data_type = "Botanical", force = FALSE) {
+  directory <- grouping_directory(data_type)
+  signature <- grouping_signature(directory)
+  key <- paste0("group_catalog::", data_type)
+  cached <- cache_get(key)
+
+  if (!force && !is.null(cached) && identical(cached$signature, signature)) {
+    return(cached$value)
+  }
+
+  grouping_files <- available_groupings(data_type, force = force)
+  catalog_rows <- lapply(seq_along(grouping_files), function(index) {
+    scheme_path <- unname(grouping_files)[[index]]
+    scheme_label <- names(grouping_files)[[index]]
+    definition <- parse_grouping_file(scheme_path)
+
+    if (!length(definition)) return(NULL)
+
+    data.frame(
+      option_id = sprintf("%s::%s", scheme_path, names(definition)),
+      scheme_path = scheme_path,
+      scheme_label = scheme_label,
+      group_name = names(definition),
+      output_label = make.unique(sprintf("%s / %s", scheme_label, names(definition))),
+      stringsAsFactors = FALSE,
+      row.names = NULL
+    ) |> transform(taxa = I(unname(definition)))
+  })
+
+  catalog_rows <- Filter(Negate(is.null), catalog_rows)
+  if (!length(catalog_rows)) {
+    value <- data.frame(
+      option_id = character(0),
+      scheme_path = character(0),
+      scheme_label = character(0),
+      group_name = character(0),
+      output_label = character(0),
+      stringsAsFactors = FALSE,
+      row.names = NULL
+    )
+  } else {
+    value <- do.call(rbind, catalog_rows)
+  }
+
+  cache_set(key, list(signature = signature, value = value))
+  value
+}
+
+group_catalog_choices <- function(data_type = "Botanical") {
+  catalog <- group_catalog(data_type)
+  if (!nrow(catalog)) return(list())
+
+  split(
+    stats::setNames(catalog$option_id, catalog$group_name),
+    catalog$scheme_label
+  )
+}
+
+# Mapping ---------------------------------------------------------------------
+
 build_group_mapping <- function(grouping_definition) {
-  mapping <- c()
+  mapping <- character(0)
 
   for (group_name in names(grouping_definition)) {
     taxa_codes <- grouping_definition[[group_name]]
-    if (length(taxa_codes) == 0) {
-      next
-    }
-
+    if (length(taxa_codes) == 0) next
     mapped_codes <- rep(group_name, length(taxa_codes))
     names(mapped_codes) <- taxa_codes
     mapping <- c(mapping, mapped_codes)
@@ -71,11 +271,7 @@ groupTaxons_from_definition <- function(
     dataset$new_txgroups <- vapply(
       matched_groups,
       function(group_names) {
-        if (!length(group_names)) {
-          return(NA_character_)
-        }
-
-        group_names[[1]]
+        if (!length(group_names)) NA_character_ else group_names[[1]]
       },
       character(1)
     )
@@ -88,14 +284,12 @@ groupTaxons_from_definition <- function(
 
   if (logging) {
     matched <- !is.na(dataset$new_txgroups)
-    message(
-      sprintf(
-        "Grouping %s unique taxa into %s categories; %s taxa remain unmatched.",
-        length(unique(dataset$TaxonCode)),
-        length(grouping_definition),
-        length(unique(dataset$TaxonCode[!matched]))
-      )
-    )
+    message(sprintf(
+      "Grouping %s unique taxa into %s categories; %s taxa remain unmatched.",
+      length(unique(dataset$TaxonCode)),
+      length(grouping_definition),
+      length(unique(dataset$TaxonCode[!matched]))
+    ))
   }
 
   dataset
@@ -119,105 +313,21 @@ groupTaxons <- function(
 }
 
 groupPeriod <- function(original_period, filename = "groupings/periods/periods.csv") {
-  periods <- read.csv(filename, stringsAsFactors = FALSE)
+  periods <- utils::read.csv(filename, stringsAsFactors = FALSE)
   grouping <- strsplit(periods$PeriodID, "\\+")
   names(grouping) <- periods$Period
   mapping <- build_group_mapping(grouping)
 
-  message(
-    sprintf(
-      "Grouping %s periods into %s larger categories.",
-      length(unique(original_period)),
-      length(grouping)
-    )
-  )
+  message(sprintf(
+    "Grouping %s periods into %s larger categories.",
+    length(unique(original_period)),
+    length(grouping)
+  ))
 
   unname(mapping[original_period])
 }
 
-format_grouping_label <- function(path) {
-  label <- tools::file_path_sans_ext(basename(path))
-  label <- gsub("^group_", "Group ", label)
-  gsub("_", " ", label)
-}
-
-is_valid_grouping_file <- function(path) {
-  tryCatch({
-    length(read_taxon_grouping(path)) > 0
-  }, error = function(error) {
-    FALSE
-  })
-}
-
-available_groupings <- function(data_type = "Faunal") {
-  directory <- if (identical(data_type, "Botanical")) {
-    "groupings/botanical_taxa"
-  } else {
-    "groupings/faunal_taxa"
-  }
-
-  files <- sort(
-    list.files(
-      directory,
-      pattern = "\\.csv$",
-      ignore.case = TRUE,
-      full.names = TRUE
-    )
-  )
-  files <- files[vapply(files, is_valid_grouping_file, logical(1))]
-
-  stats::setNames(files, vapply(files, format_grouping_label, character(1)))
-}
-
-group_catalog <- function(data_type = "Botanical") {
-  grouping_files <- available_groupings(data_type)
-  catalog_rows <- lapply(seq_along(grouping_files), function(index) {
-    scheme_path <- unname(grouping_files)[[index]]
-    scheme_label <- names(grouping_files)[[index]]
-    grouping_definition <- read_taxon_grouping(scheme_path)
-
-    if (!length(grouping_definition)) {
-      return(NULL)
-    }
-
-    data.frame(
-      option_id = sprintf("%s::%s", scheme_path, names(grouping_definition)),
-      scheme_path = scheme_path,
-      scheme_label = scheme_label,
-      group_name = names(grouping_definition),
-      output_label = make.unique(sprintf("%s / %s", scheme_label, names(grouping_definition))),
-      stringsAsFactors = FALSE,
-      row.names = NULL
-    ) |> transform(taxa = I(unname(grouping_definition)))
-  })
-
-  catalog_rows <- Filter(Negate(is.null), catalog_rows)
-  if (!length(catalog_rows)) {
-    return(data.frame(
-      option_id = character(0),
-      scheme_path = character(0),
-      scheme_label = character(0),
-      group_name = character(0),
-      output_label = character(0),
-      stringsAsFactors = FALSE,
-      row.names = NULL
-    ))
-  }
-
-  do.call(rbind, catalog_rows)
-}
-
-group_catalog_choices <- function(data_type = "Botanical") {
-  catalog <- group_catalog(data_type)
-  if (!nrow(catalog)) {
-    return(list())
-  }
-
-  split(
-    stats::setNames(catalog$option_id, catalog$group_name),
-    catalog$scheme_label
-  )
-}
+# Catalog helpers -------------------------------------------------------------
 
 group_definition_overlap_summary <- function(grouping_definition) {
   taxon_lookup <- data.frame(
@@ -228,9 +338,7 @@ group_definition_overlap_summary <- function(grouping_definition) {
   )
   taxon_lookup <- unique(taxon_lookup)
 
-  if (!nrow(taxon_lookup)) {
-    return(list())
-  }
+  if (!nrow(taxon_lookup)) return(list())
 
   overlap_counts <- table(taxon_lookup$taxon_code)
   overlapping_taxa <- names(overlap_counts[overlap_counts > 1L])
@@ -248,9 +356,7 @@ group_definition_from_catalog <- function(selection_ids, data_type = "Botanical"
   selected_rows <- catalog[match(selection_ids, catalog$option_id), , drop = FALSE]
   selected_rows <- selected_rows[!is.na(selected_rows$option_id), , drop = FALSE]
 
-  if (!nrow(selected_rows)) {
-    return(list())
-  }
+  if (!nrow(selected_rows)) return(list())
 
   grouping_definition <- selected_rows$taxa
   names(grouping_definition) <- selected_rows$output_label
@@ -266,7 +372,7 @@ group_summary_stats <- function(dataset) {
   )
   empty_groups$taxa <- I(vector("list", 0))
 
-  if (!"new_txgroups" %in% names(dataset)) {
+  if (is.null(dataset) || !"new_txgroups" %in% names(dataset)) {
     return(list(groups = empty_groups, unmatched = 0))
   }
 
@@ -295,11 +401,13 @@ group_summary_stats <- function(dataset) {
   rownames(groups) <- NULL
 
   unmatched_taxa <- length(unique(dataset$TaxonCode[!matched_rows]))
-
   list(groups = groups, unmatched = unmatched_taxa)
 }
 
+# Dataset helpers -------------------------------------------------------------
+
 unique_site_points <- function(dataset) {
+  if (is.null(dataset) || !nrow(dataset)) return(NULL)
   dataset[!duplicated(dataset$SiteId), , drop = FALSE]
 }
 
@@ -310,6 +418,7 @@ standardize_taxa_dataset <- function(dataset, count_column, source_label) {
   } else {
     rep(NA_character_, nrow(dataset))
   }
+
   source_record_id <- if ("FaunalSpeciesID" %in% names(dataset)) {
     paste("Faunal", as.character(dataset$FaunalSpeciesID), sep = ":")
   } else if ("SampleID" %in% names(dataset)) {
@@ -317,6 +426,7 @@ standardize_taxa_dataset <- function(dataset, count_column, source_label) {
   } else {
     paste(source_label, seq_len(nrow(dataset)), sep = ":")
   }
+
   group_values <- if ("new_txgroups" %in% names(dataset)) {
     as.character(dataset$new_txgroups)
   } else {
@@ -403,7 +513,11 @@ combine_grouped_taxa_datasets <- function(
     analysis_notes <- c(
       analysis_notes,
       sprintf(
-        "Selected botanical subgroups overlap on %s taxa. Matching botanical records were counted in each selected subgroup, so some counts are duplicated. Examples: %s%s.",
+        paste0(
+          "Selected botanical subgroups overlap on %s taxa. Matching botanical ",
+          "records were counted in each selected subgroup, so some counts are ",
+          "duplicated. Examples: %s%s."
+        ),
         length(overlapping_taxa),
         paste(overlap_messages, collapse = "; "),
         extra_message
@@ -417,9 +531,7 @@ combine_grouped_taxa_datasets <- function(
 
 combine_site_points <- function(faunal_sites, botanical_sites) {
   standardize_sites <- function(dataset) {
-    if (is.null(dataset) || !nrow(dataset)) {
-      return(NULL)
-    }
+    if (is.null(dataset) || !nrow(dataset)) return(NULL)
 
     sf::st_sf(
       data.frame(
@@ -439,9 +551,7 @@ combine_site_points <- function(faunal_sites, botanical_sites) {
     list(standardize_sites(faunal_sites), standardize_sites(botanical_sites))
   )
 
-  if (!length(site_frames)) {
-    return(NULL)
-  }
+  if (!length(site_frames)) return(NULL)
 
   combined_sites <- do.call(rbind, site_frames)
   unique_site_points(combined_sites)
@@ -461,12 +571,61 @@ first_intersection_id <- function(intersections) {
   vapply(
     intersections,
     function(indexes) {
-      if (length(indexes) == 0) {
-        return(NA_integer_)
-      }
-
+      if (length(indexes) == 0) return(NA_integer_)
       as.integer(indexes[[1]])
     },
     integer(1)
   )
+}
+
+# Grouping-file editing -------------------------------------------------------
+
+ensure_column_count <- function(data, count) {
+  if (is.null(data)) data <- data.frame()
+  while (ncol(data) < count) {
+    data[[ncol(data) + 1L]] <- NA
+  }
+  data[, seq_len(count), drop = FALSE]
+}
+
+read_grouping_rows <- function(path) {
+  raw <- utils::read.csv(
+    path,
+    header = FALSE,
+    fill = TRUE,
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+  if (!ncol(raw) || !nrow(raw)) {
+    stop("The grouping file is empty.")
+  }
+  if (ncol(raw) < 3) {
+    raw <- ensure_column_count(raw, 3)
+  }
+
+  first_col <- trimws(as.character(raw[[1]]))
+  is_group <- grepl("^[0-9]+[.)]?$", first_col)
+
+  list(raw = raw, is_group = is_group, column_count = ncol(raw))
+}
+
+merge_grouping_rows <- function(preamble, groups) {
+  count <- max(ncol(preamble), ncol(groups), 3L)
+  rbind(
+    ensure_column_count(preamble, count),
+    ensure_column_count(groups, count)
+  )
+}
+
+write_grouping_rows <- function(data, path) {
+  utils::write.table(
+    data,
+    path,
+    sep = ",",
+    row.names = FALSE,
+    col.names = FALSE,
+    na = "",
+    quote = TRUE
+  )
+  invisible(path)
 }

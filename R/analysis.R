@@ -53,17 +53,36 @@ split_periods <- function(dataset, selection, start, end, len) {
 }
 
 parse_phase_labels <- function(labels) {
-  label_parts <- strsplit(labels, "-", fixed = TRUE)
+  labels <- as.character(labels)
+  period <- character(length(labels))
+  area <- integer(length(labels))
+
+  for (index in seq_along(labels)) {
+    label <- labels[[index]]
+
+    if (grepl(PHASE_SEPARATOR, label, fixed = TRUE)) {
+      parts <- strsplit(label, PHASE_SEPARATOR, fixed = TRUE)[[1]]
+    } else {
+      # Backwards compatibility for phase ids written with a hyphen.
+      parts <- strsplit(label, "-", fixed = TRUE)[[1]]
+      if (length(parts) > 1) {
+        parts <- c(paste(parts[-length(parts)], collapse = "-"), parts[[length(parts)]])
+      }
+    }
+
+    if (!length(parts)) {
+      period[[index]] <- label
+      area[[index]] <- NA_integer_
+      next
+    }
+
+    period[[index]] <- parts[[1]]
+    area[[index]] <- suppressWarnings(as.integer(parts[[length(parts)]]))
+  }
 
   data.frame(
-    period = vapply(
-      label_parts,
-      function(parts) {
-        paste(parts[seq_len(length(parts) - 1L)], collapse = "-")
-      },
-      character(1)
-    ),
-    area = as.integer(vapply(label_parts, function(parts) parts[[length(parts)]], character(1))),
+    period = period,
+    area = area,
     stringsAsFactors = FALSE
   )
 }
@@ -93,7 +112,7 @@ phase_levels_from_data <- function(period_values, area_ids) {
   }
 
   as.vector(unlist(
-    lapply(period_levels, function(period) paste(period, area_ids, sep = "-")),
+    lapply(period_levels, function(period) paste(period, area_ids, sep = PHASE_SEPARATOR)),
     use.names = FALSE
   ))
 }
@@ -120,7 +139,7 @@ prepare_analysis_data <- function(dataset, polygons) {
   }
 
   area_ids <- sort(unique(prepared$new_area))
-  phase_values <- paste(as.character(prepared$new_periods), prepared$new_area, sep = "-")
+  phase_values <- paste(as.character(prepared$new_periods), prepared$new_area, sep = PHASE_SEPARATOR)
   phase_levels <- phase_levels_from_data(prepared$new_periods, area_ids)
   prepared$phase <- factor(phase_values, levels = phase_levels, ordered = TRUE)
 
@@ -241,6 +260,27 @@ run_ordination <- function(count_matrix, analysis_method, pca_transform = "log1p
   }
 
   pca_input <- as.matrix(ordination_matrix)
+
+  # prcomp(rank. = k) only returns k components, so the total variance must be
+  # computed from the (centred/scaled) input rather than from the retained
+  # eigenvalues. Otherwise "percentage of variance" is inflated whenever more
+  # than k components exist.
+  centred_input <- if (center_columns) {
+    sweep(pca_input, 2, colMeans(pca_input), "-")
+  } else {
+    pca_input
+  }
+  if (scale_columns) {
+    column_sd <- apply(centred_input, 2, function(column) {
+      sqrt(sum(column^2) / max(nrow(centred_input) - 1L, 1L))
+    })
+    column_sd[!is.finite(column_sd) | column_sd == 0] <- 1
+    scaled_input <- sweep(centred_input, 2, column_sd, "/")
+  } else {
+    scaled_input <- centred_input
+  }
+  total_variance <- sum(scaled_input^2) / max(nrow(scaled_input) - 1L, 1L)
+
   model <- stats::prcomp(
     pca_input,
     center = center_columns,
@@ -250,7 +290,10 @@ run_ordination <- function(count_matrix, analysis_method, pca_transform = "log1p
   retained_dimensions <- seq_len(ncol(model$rotation))
   retained_sdev <- model$sdev[retained_dimensions]
   eigenvalues <- retained_sdev^2
-  percentages <- eigenvalues / sum(eigenvalues) * 100
+  if (!is.finite(total_variance) || total_variance <= 0) {
+    total_variance <- sum(eigenvalues)
+  }
+  percentages <- eigenvalues / total_variance * 100
   cumulative <- cumsum(percentages)
   eig <- cbind(
     eigenvalue = eigenvalues,
@@ -522,7 +565,9 @@ build_phase_assignment_data <- function(subregions, count_column) {
     ),
     names(phase_frame)
   )
-  selected_columns <- c(selected_columns, culture_column[1])
+  if (length(culture_column)) {
+    selected_columns <- c(selected_columns, culture_column[[1]])
+  }
   selected_columns <- unique(selected_columns)
 
   phase_frame$phase_id <- phase_assignment_key(phase_frame)
@@ -604,6 +649,20 @@ compute_analysis <- function(dataset, polygons, data_type, analysis_method = "ca
   )
   used_polygon_count <- length(unique(subregions$new_area))
   notes <- c(count_bundle$notes, dataset_notes, ordination_bundle$notes)
+
+  if (ncol(ordination_bundle$matrix) < 3) {
+    notes <- c(
+      notes,
+      sprintf(
+        paste0(
+          "The selected grouping produced only %s taxon group(s). At least three ",
+          "groups are needed for a two-dimensional ordination map — choose a ",
+          "richer grouping scheme to plot the ordination."
+        ),
+        ncol(ordination_bundle$matrix)
+      )
+    )
+  }
 
   if (identical(data_type, "Combined")) {
     notes <- c(notes, "Combined mode merges faunal NISP and botanical counts into the same matrix.")

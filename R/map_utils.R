@@ -12,7 +12,7 @@ normalize_polygon_data <- function(polygons, reference_data) {
   }
 
   geometry_types <- unique(as.character(sf::st_geometry_type(polygons, by_geometry = TRUE)))
-  if (!all(grepl("POLYGON", geometry_types))) {
+  if (!all(geometry_types %in% c("POLYGON", "MULTIPOLYGON"))) {
     stop("Polygon data must contain polygon geometries.")
   }
 
@@ -110,9 +110,9 @@ site_colors <- function(points, polygons, palette = areapal, normalize = TRUE) {
 site_popup_label <- function(points) {
   paste0(
     "<strong>",
-    points$SiteName,
+    htmltools::htmlEscape(points$SiteName),
     "</strong><br/>",
-    points$Country
+    htmltools::htmlEscape(points$Country)
   )
 }
 

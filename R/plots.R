@@ -1,6 +1,7 @@
 empty_plot_message <- function(message) {
   plot.new()
-  text(0.5, 0.5, message, cex = 1.05)
+  wrapped <- paste(strwrap(message, width = 62), collapse = "\n")
+  text(0.5, 0.5, wrapped, cex = 1.02)
 }
 
 taxon_group_palette <- function(group_names) {
@@ -134,8 +135,13 @@ countTotal <- function(dataset, count_column) {
     xlab = "",
     ylab = count_column,
     xaxt = "n",
-    ylim = y_range
+    ylim = y_range,
+    main = "Raw counts by period",
+    col.main = "#0f172a",
+    bty = "l"
   )
+  grid(nx = NA, ny = NULL, col = "#e2e8f0", lty = 1)
+  box(bty = "l", col = "#94a3b8")
 
   for (column_index in seq_len(ncol(counts))) {
     lines(
@@ -214,7 +220,7 @@ bySpeciesComposition <- function(dataset, count_column) {
   }
 }
 
-byCultureComposition <- function(dataset, count_column) {
+byCultureComposition <- function(dataset, count_column, culture_limit = NULL) {
   culture_column <- intersect(c("Culture", "Culture1"), names(dataset))[1]
 
   if (is.na(culture_column) || is.null(culture_column)) {
@@ -248,6 +254,18 @@ byCultureComposition <- function(dataset, count_column) {
     return(invisible(NULL))
   }
 
+  culture_totals <- colSums(composition)
+  culture_order <- order(-culture_totals, colnames(composition))
+  composition <- composition[, culture_order, drop = FALSE]
+  culture_totals <- culture_totals[culture_order]
+
+  total_cultures <- ncol(composition)
+  if (!is.null(culture_limit) && is.numeric(culture_limit) && culture_limit >= 1) {
+    keep <- seq_len(min(culture_limit, total_cultures))
+    composition <- composition[, keep, drop = FALSE]
+    culture_totals <- culture_totals[keep]
+  }
+
   proportions <- sweep(composition, 2, colSums(composition), FUN = "/")
   proportions[is.na(proportions)] <- 0
   group_colors <- taxon_group_palette(rownames(proportions))
@@ -255,13 +273,23 @@ byCultureComposition <- function(dataset, count_column) {
   old_par <- par(no.readonly = TRUE)
   on.exit(par(old_par), add = TRUE)
 
+  title <- if (ncol(composition) < total_cultures) {
+    sprintf(
+      "Taxon composition by culture (top %s of %s by total counts)",
+      ncol(composition),
+      total_cultures
+    )
+  } else {
+    "Taxon composition by culture"
+  }
+
   par(mar = c(9, 4, 4, 1), xpd = TRUE)
   barplot(
     proportions,
     col = unname(group_colors[rownames(proportions)]),
     las = 2,
     ylab = "Share of counts",
-    main = "Taxon composition by culture",
+    main = title,
     border = NA
   )
 
@@ -310,7 +338,14 @@ present_period_levels <- function(period_values, period_levels = NULL) {
   resolve_period_levels(period_values)
 }
 
-plotOrdinationArrowsBase <- function(ordination_result, period_levels = NULL, culture_coordinates = NULL) {
+plotOrdinationArrowsBase <- function(
+  ordination_result,
+  period_levels = NULL,
+  culture_coordinates = NULL,
+  show_year_labels = FALSE,
+  show_taxa_labels = FALSE,
+  show_culture_labels = FALSE
+) {
   old_par <- par(no.readonly = TRUE)
   on.exit(par(old_par), add = TRUE)
 
@@ -320,7 +355,7 @@ plotOrdinationArrowsBase <- function(ordination_result, period_levels = NULL, cu
     colnames(row_coordinates) <- paste('Dim', seq_len(ncol(row_coordinates)))
   }
   if (ncol(row_coordinates) < 2) {
-    empty_plot_message(sprintf("At least two dimensions are needed for the %s map.", tolower(ordination_result$method_label)))
+    empty_plot_message(sprintf("At least two ordination dimensions are needed for the %s map. Choose a grouping scheme with more taxon groups.", tolower(ordination_result$method_label)))
     return(invisible(NULL))
   }
 
@@ -341,11 +376,13 @@ plotOrdinationArrowsBase <- function(ordination_result, period_levels = NULL, cu
 
   plot_x <- row_coordinates[, 1]
   plot_y <- row_coordinates[, 2]
-  if (!is.null(column_coordinates) && nrow(column_coordinates) && ncol(column_coordinates) >= 2) {
+  if (isTRUE(show_taxa_labels) && !is.null(column_coordinates) &&
+      nrow(column_coordinates) && ncol(column_coordinates) >= 2) {
     plot_x <- c(plot_x, column_coordinates[, 1])
     plot_y <- c(plot_y, column_coordinates[, 2])
   }
-  if (!is.null(culture_matrix) && nrow(culture_matrix) && ncol(culture_matrix) >= 2) {
+  if (isTRUE(show_culture_labels) && !is.null(culture_matrix) &&
+      nrow(culture_matrix) && ncol(culture_matrix) >= 2) {
     plot_x <- c(plot_x, culture_matrix[, 1])
     plot_y <- c(plot_y, culture_matrix[, 2])
   }
@@ -381,15 +418,17 @@ plotOrdinationArrowsBase <- function(ordination_result, period_levels = NULL, cu
     area_data <- coordinate_frame[coordinate_frame$area == area_ids[area_index], , drop = FALSE]
     area_data <- area_data[order(area_data$period), , drop = FALSE]
 
-    points( area_data[[x_name]], area_data[[y_name]], pch = 16, cex = 1.2, col = area_colors[area_index])
-    text(
-      area_data[[x_name]],
-      area_data[[y_name]],
-      labels = area_data$label,
-      pos = 3,
-      cex = 0.8,
-      col = area_colors[area_index]
-    )
+    points(area_data[[x_name]], area_data[[y_name]], pch = 16, cex = 1.2, col = area_colors[area_index])
+    if (isTRUE(show_year_labels)) {
+      text(
+        area_data[[x_name]],
+        area_data[[y_name]],
+        labels = area_data$label,
+        pos = 3,
+        cex = 0.8,
+        col = area_colors[area_index]
+      )
+    }
 
     arrow_segments <- shorten_segments(as.matrix(area_data[, c(x_name, y_name)]), 0.03)
     if (!is.null(arrow_segments)) {
@@ -405,7 +444,7 @@ plotOrdinationArrowsBase <- function(ordination_result, period_levels = NULL, cu
     }
   }
 
-  if (!is.null(column_coordinates) && ncol(column_coordinates) >= 2) {
+  if (isTRUE(show_taxa_labels) && !is.null(column_coordinates) && ncol(column_coordinates) >= 2) {
     text(
       column_coordinates[, 1],
       column_coordinates[, 2],
@@ -417,9 +456,11 @@ plotOrdinationArrowsBase <- function(ordination_result, period_levels = NULL, cu
   }
 
   culture_color <- "#b45309"
-  if (!is.null(culture_coordinates)) {
+  culture_shown <- FALSE
+  if (isTRUE(show_culture_labels) && !is.null(culture_coordinates)) {
     culture_coordinates <- as.matrix(culture_coordinates)
     if (nrow(culture_coordinates) && ncol(culture_coordinates) >= 2) {
+      culture_shown <- TRUE
       points(
         culture_coordinates[, 1],
         culture_coordinates[, 2],
@@ -442,7 +483,7 @@ plotOrdinationArrowsBase <- function(ordination_result, period_levels = NULL, cu
   legend_labels <- paste("Area", area_ids)
   legend_colors <- area_colors
   legend_symbols <- rep(16, length(area_ids))
-  if (!is.null(culture_coordinates) && nrow(as.matrix(culture_coordinates))) {
+  if (culture_shown) {
     legend_labels <- c(legend_labels, "Culture")
     legend_colors <- c(legend_colors, culture_color)
     legend_symbols <- c(legend_symbols, 17)
@@ -467,7 +508,14 @@ plotOrdinationArrows <- function(
   show_culture_labels = FALSE
 ) {
   if (!requireNamespace("ggplot2", quietly = TRUE) || !requireNamespace("ggrepel", quietly = TRUE)) {
-    plotOrdinationArrowsBase(ordination_result, period_levels, culture_coordinates)
+    plotOrdinationArrowsBase(
+      ordination_result,
+      period_levels,
+      culture_coordinates,
+      show_year_labels = show_year_labels,
+      show_taxa_labels = show_taxa_labels,
+      show_culture_labels = show_culture_labels
+    )
     return(invisible(NULL))
   }
 
@@ -476,7 +524,7 @@ plotOrdinationArrows <- function(
     colnames(row_coordinates) <- paste("Dim", seq_len(ncol(row_coordinates)))
   }
   if (ncol(row_coordinates) < 2) {
-    empty_plot_message(sprintf("At least two dimensions are needed for the %s map.", tolower(ordination_result$method_label)))
+    empty_plot_message(sprintf("At least two ordination dimensions are needed for the %s map. Choose a grouping scheme with more taxon groups.", tolower(ordination_result$method_label)))
     return(invisible(NULL))
   }
 

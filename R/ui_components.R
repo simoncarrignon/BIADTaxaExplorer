@@ -396,6 +396,32 @@ app_ui <- function() {
                   class = "btn-sm btn-danger-soft"
                 )
               ),
+              tags$details(
+                class = "manage-details reference-details",
+                tags$summary(
+                  tags$span("Reference points (CSV)"),
+                  uiOutput("reference_meta", inline = TRUE)
+                ),
+                div(
+                  class = "manage-body",
+                  fileInput(
+                    "reference_csv",
+                    NULL,
+                    accept = ".csv",
+                    buttonLabel = tagList(app_icon("upload"), "Upload CSV"),
+                    placeholder = "No file selected",
+                    width = "100%"
+                  ),
+                  uiOutput("reference_columns_ui"),
+                  uiOutput("reference_status_ui"),
+                  uiOutput("reference_controls_ui"),
+                  helper_text(
+                    "Coordinates are treated as WGS84 decimal degrees. ",
+                    "Longitude and latitude columns are detected from their names; ",
+                    "adjust the chooser if needed."
+                  )
+                )
+              ),
               uiOutput("taxon_table"),
               tags$details(
                 class = "manage-details",

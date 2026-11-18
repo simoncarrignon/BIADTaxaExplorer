@@ -11,6 +11,11 @@ server <- function(input, output, session) {
   default_polygons_attempted <- reactiveVal(FALSE)
   grouping_revision <- reactiveVal(0)
   group_catalog_version <- reactiveVal(0)
+  reference_csv <- reactiveVal(NULL)
+  reference_points <- reactiveVal(NULL)
+  reference_info <- reactiveVal(NULL)
+  reference_signature <- reactiveVal(NULL)
+
   group_edit_store <- new.env(parent = emptyenv())
 
   # Data loading --------------------------------------------------------------
@@ -465,6 +470,212 @@ server <- function(input, output, session) {
     status_pill("Ready to run.", "neutral")
   })
 
+  # Reference points (CSV) ----------------------------------------------------
+  output$reference_meta <- renderUI({
+    info <- reference_info()
+    if (is.null(info) || is.null(info$count) || info$count == 0) return("none")
+    sprintf("%s point%s", info$count, if (info$count == 1) "" else "s")
+  })
+
+  output$reference_columns_ui <- renderUI({
+    state <- reference_csv()
+    if (is.null(state)) return(NULL)
+
+    columns <- names(state$data)
+    choices <- c("Select a column" = "", stats::setNames(columns, columns))
+
+    tagList(
+      selectInput(
+        "reference_lon",
+        "Longitude column",
+        choices = choices,
+        selected = state$lon %||% "",
+        width = "100%"
+      ),
+      selectInput(
+        "reference_lat",
+        "Latitude column",
+        choices = choices,
+        selected = state$lat %||% "",
+        width = "100%"
+      )
+    )
+  })
+
+  output$reference_status_ui <- renderUI({
+    state <- reference_csv()
+    if (is.null(state)) return(NULL)
+
+    info <- reference_info()
+    if (is.null(info)) return(helper_text("Choose the longitude and latitude columns."))
+
+    if (is.null(info$count) || info$count == 0) {
+      return(helper_text(info$message %||% "No valid points yet."))
+    }
+
+    detail <- sprintf("%s of %s rows have valid coordinates", info$count, info$total)
+    if (info$skipped > 0) {
+      detail <- paste0(detail, sprintf(" · %s skipped", info$skipped))
+    }
+    helper_text(detail)
+  })
+
+  output$reference_controls_ui <- renderUI({
+    info <- reference_info()
+    if (is.null(info) || is.null(info$count) || info$count == 0) return(NULL)
+
+    div(
+      class = "reference-controls",
+      checkboxInput("show_reference_points", "Show on map", TRUE),
+      actionButton(
+        "clear_reference_points",
+        tagList(app_icon("trash"), "Remove"),
+        class = "btn-sm btn-danger-soft"
+      )
+    )
+  })
+
+  observeEvent(input$reference_csv, {
+    upload <- input$reference_csv
+    req(upload$datapath)
+
+    tryCatch({
+      data <- utils::read.csv(
+        upload$datapath,
+        stringsAsFactors = FALSE,
+        check.names = FALSE,
+        na.strings = c("", "NA", "NaN", "null")
+      )
+
+      if (!ncol(data) || !nrow(data)) {
+        stop("The CSV is empty.")
+      }
+
+      names(data)[1] <- sub("^\ufeff", "", names(data)[1])
+      names(data) <- make.unique(names(data))
+
+      detected <- detect_reference_columns(names(data))
+      state <- list(
+        data = data,
+        name = basename(upload$name),
+        lon = detected$lon,
+        lat = detected$lat
+      )
+      reference_csv(state)
+
+      info <- build_reference_points(data, detected$lon, detected$lat)
+      reference_points(info$points)
+      reference_info(list(
+        count = if (is.null(info$points)) 0L else nrow(info$points),
+        skipped = info$skipped,
+        total = info$total,
+        message = info$message
+      ))
+      reference_signature(paste(
+        state$name,
+        nrow(data),
+        detected$lon %||% "",
+        detected$lat %||% "",
+        sep = "|"
+      ))
+
+      if (!is.null(info$points)) {
+        msg <- sprintf(
+          "Loaded %s: %s point%s",
+          state$name,
+          nrow(info$points),
+          if (nrow(info$points) == 1) "" else "s"
+        )
+        if (info$skipped > 0) {
+          msg <- paste0(msg, sprintf(" (%s skipped)", info$skipped))
+        }
+        if (!is.null(detected$lon) && !is.null(detected$lat)) {
+          msg <- paste0(msg, sprintf(". Using %s / %s.", detected$lon, detected$lat))
+        }
+        showNotification(msg, type = "message", duration = 6)
+      } else {
+        showNotification(
+          info$message %||% "Choose the longitude and latitude columns.",
+          type = "warning",
+          duration = 6
+        )
+      }
+    }, error = function(error) {
+      showNotification(
+        paste("Could not read CSV:", conditionMessage(error)),
+        type = "error",
+        duration = 8
+      )
+    })
+  }, ignoreInit = TRUE)
+
+  observeEvent(list(input$reference_lon, input$reference_lat), {
+    state <- reference_csv()
+    if (is.null(state)) return()
+
+    if (!is.null(input$reference_lon) && nzchar(input$reference_lon) &&
+        !input$reference_lon %in% names(state$data)) {
+      return()
+    }
+    if (!is.null(input$reference_lat) && nzchar(input$reference_lat) &&
+        !input$reference_lat %in% names(state$data)) {
+      return()
+    }
+
+    info <- build_reference_points(state$data, input$reference_lon, input$reference_lat)
+    reference_points(info$points)
+    reference_info(list(
+      count = if (is.null(info$points)) 0L else nrow(info$points),
+      skipped = info$skipped,
+      total = info$total,
+      message = info$message
+    ))
+
+    signature <- paste(
+      state$name,
+      nrow(state$data),
+      input$reference_lon %||% "",
+      input$reference_lat %||% "",
+      sep = "|"
+    )
+    if (identical(signature, reference_signature())) return()
+    reference_signature(signature)
+
+    if (!is.null(info$points)) {
+      showNotification(
+        sprintf(
+          "%s reference point%s loaded.",
+          nrow(info$points),
+          if (nrow(info$points) == 1) "" else "s"
+        ),
+        type = "message",
+        duration = 3
+      )
+      if (info$skipped > 0) {
+        showNotification(
+          sprintf(
+            "%s row%s skipped because coordinates were missing or out of range.",
+            info$skipped,
+            if (info$skipped == 1) "" else "s"
+          ),
+          type = "warning",
+          duration = 6
+        )
+      }
+    } else if (!is.null(info$message)) {
+      showNotification(info$message, type = "warning", duration = 5)
+    }
+  }, ignoreInit = FALSE)
+
+  observeEvent(input$clear_reference_points, {
+    reference_csv(NULL)
+    reference_points(NULL)
+    reference_info(NULL)
+    reference_signature(NULL)
+    leafletProxy("map") |> clearGroup("reference-points")
+    showNotification("Reference points removed.", type = "message", duration = 3)
+  }, ignoreInit = TRUE)
+
   output$analysis_status <- renderUI({
     build_analysis_status_ui(analysis_result(), analysis_stale())
   })
@@ -592,7 +803,8 @@ server <- function(input, output, session) {
 
     proxy <- leafletProxy("map") |>
       clearGroup("sites") |>
-      clearGroup("selected-polygons")
+      clearGroup("selected-polygons") |>
+      clearGroup("reference-points")
 
     if (!is.null(points) && nrow(points)) {
       proxy <- proxy |>
@@ -623,6 +835,22 @@ server <- function(input, output, session) {
         )
     }
 
+    reference <- reference_points()
+    show_reference <- if (is.null(input$show_reference_points)) {
+      TRUE
+    } else {
+      isTRUE(input$show_reference_points)
+    }
+    if (!is.null(reference) && nrow(reference) && show_reference) {
+      proxy <- proxy |>
+        addMarkers(
+          data = reference,
+          icon = reference_cross_icon(),
+          popup = reference_popup_label(reference),
+          group = "reference-points"
+        )
+    }
+
     invisible(proxy)
   })
 
@@ -643,6 +871,12 @@ server <- function(input, output, session) {
       proxy |> fit_map_to_data(points = points)
     }
   }, ignoreInit = FALSE)
+
+  observeEvent(reference_points(), {
+    reference <- reference_points()
+    if (is.null(reference) || !nrow(reference)) return()
+    leafletProxy("map") |> fit_map_to_data(points = reference)
+  }, ignoreInit = TRUE)
 
   observeEvent(input$map_draw_new_feature, {
     current_polygons(append_drawn_polygon(
@@ -679,6 +913,7 @@ server <- function(input, output, session) {
     current_polygons(NULL)
     leafletProxy("map") |>
       clearGroup("selected-polygons") |>
+      clearGroup("reference-points") |>
       map_draw_toolbar(clear_features = TRUE) |>
       map_draw_toolbar()
     showNotification("Polygons cleared.", type = "message", duration = 3)
@@ -1074,6 +1309,10 @@ server <- function(input, output, session) {
   # Reset ---------------------------------------------------------------------
   observeEvent(input$reset_app, {
     current_polygons(NULL)
+    reference_csv(NULL)
+    reference_points(NULL)
+    reference_info(NULL)
+    reference_signature(NULL)
     analysis_result(NULL)
     analysis_stale(FALSE)
     default_polygons_attempted(FALSE)
@@ -1107,6 +1346,7 @@ server <- function(input, output, session) {
 
     leafletProxy("map") |>
       clearGroup("selected-polygons") |>
+      clearGroup("reference-points") |>
       map_draw_toolbar(clear_features = TRUE) |>
       map_draw_toolbar()
 

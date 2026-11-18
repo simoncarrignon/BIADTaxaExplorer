@@ -38,6 +38,7 @@ app_files <- c(
   "R/cache.R",
   "R/tools.R",
   "R/data_store.R",
+  "R/reference_points.R",
   "R/map_utils.R",
   "R/analysis.R",
   "R/plots.R",

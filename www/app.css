@@ -486,6 +486,38 @@ body {
   content: "−";
 }
 
+.reference-details > summary .shiny-html-output {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.reference-details > summary::after {
+  margin-left: 0.35rem;
+}
+
+.reference-details .helper-text {
+  margin-bottom: 0;
+}
+
+.reference-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+
+.reference-controls .form-check {
+  margin: 0;
+}
+
+.reference-controls .form-check-label {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+
 .manage-body {
   margin-top: 0.55rem;
 }

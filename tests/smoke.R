@@ -94,6 +94,17 @@ if (!identical(as.character(reference$points$.reference_label), "1")) {
 same_column <- build_reference_points(data.frame(a = 1), "a", "a")
 if (!is.null(same_column$points)) fail("Identical lon/lat columns were accepted.")
 
+# Default study area ------------------------------------------------------------
+reference_point <- sf::st_as_sf(
+  data.frame(lon = 10, lat = 50),
+  coords = c("lon", "lat"),
+  crs = 4326
+)
+default_polygons <- load_polygon_file(DEFAULT_POLYGON_PATH, reference_point)
+if (is.null(default_polygons) || nrow(default_polygons) != 3L) {
+  fail("The default study-area GeoPackage did not load three polygons.")
+}
+
 # UI construction --------------------------------------------------------------
 ui <- app_ui()
 if (!inherits(ui, "shiny.tag") && !inherits(ui, "shiny.tag.list")) {

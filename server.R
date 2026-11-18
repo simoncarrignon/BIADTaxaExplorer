@@ -18,6 +18,13 @@ server <- function(input, output, session) {
 
   group_edit_store <- new.env(parent = emptyenv())
 
+  # Prefer the current study-area file even if the deployment still has an
+  # older global.R defining DEFAULT_POLYGON_PATH.
+  default_polygon_path <- "groupings/spatial/polygon_18112026_SC_v2.gpkg"
+  if (!file.exists(default_polygon_path) && exists("DEFAULT_POLYGON_PATH", inherits = TRUE)) {
+    default_polygon_path <- DEFAULT_POLYGON_PATH
+  }
+
   # Data loading --------------------------------------------------------------
   load_data <- function(refresh = FALSE) {
     data_loading(TRUE)
@@ -778,11 +785,11 @@ server <- function(input, output, session) {
 
     default_polygons_attempted(TRUE)
     default_polygons <- tryCatch(
-      load_polygon_file(DEFAULT_POLYGON_PATH, points, layer = DEFAULT_POLYGON_LAYER),
+      load_polygon_file(default_polygon_path, points),
       error = function(error) {
         warning(sprintf(
           "Failed to load default polygons from '%s': %s",
-          DEFAULT_POLYGON_PATH,
+          default_polygon_path,
           conditionMessage(error)
         ))
         NULL

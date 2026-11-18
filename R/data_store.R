@@ -1,7 +1,46 @@
 # Cached access to the BIAD database ------------------------------------------
 
+.biad_cache <- new.env(parent = emptyenv())
+
+# Shiny Server deployments usually run from a read-only app directory, so the
+# cache location must be chosen at runtime. Prefer the local cache/ directory
+# (useful in development), then a user cache, then a temporary directory.
+biad_cache_dir <- function() {
+  if (!is.null(.biad_cache$dir)) {
+    return(.biad_cache$dir)
+  }
+
+  candidates <- c(
+    Sys.getenv("BIAD_CACHE_DIR", unset = ""),
+    file.path(getwd(), "cache"),
+    tryCatch(tools::R_user_dir("BIADTaxaExplorer", "cache"), error = function(e) ""),
+    file.path(tempdir(), "biad-cache")
+  )
+  candidates <- unique(candidates[nzchar(candidates)])
+
+  is_writable_dir <- function(directory) {
+    if (!dir.exists(directory)) {
+      created <- suppressWarnings(dir.create(directory, recursive = TRUE, showWarnings = FALSE))
+      if (!isTRUE(created)) return(FALSE)
+    }
+    file.access(directory, mode = 2) == 0
+  }
+
+  chosen <- NULL
+  for (candidate in candidates) {
+    if (is_writable_dir(candidate)) {
+      chosen <- candidate
+      break
+    }
+  }
+  if (is.null(chosen)) chosen <- tempdir()
+
+  .biad_cache$dir <- normalizePath(chosen, mustWork = FALSE)
+  .biad_cache$dir
+}
+
 biad_cache_file <- function() {
-  file.path("cache", "biad_data.rds")
+  file.path(biad_cache_dir(), "biad_data.rds")
 }
 
 biad_cache_ttl <- function() {
@@ -36,8 +75,11 @@ clear_biad_cache <- function() {
 load_biad_data <- function(refresh = FALSE, quiet = FALSE) {
   path <- biad_cache_file()
 
-  if (!refresh && biad_cache_fresh(path)) {
-    cached <- tryCatch(readRDS(path), error = function(e) NULL)
+  if (!refresh && file.exists(path) && biad_cache_fresh(path)) {
+    cached <- tryCatch(
+      suppressWarnings(readRDS(path)),
+      error = function(e) NULL
+    )
     if (!is.null(cached) && all(c("faunal", "botanical") %in% names(cached))) {
       cached$source <- "cache"
       cached$cache_age <- biad_cache_age(path)
@@ -62,10 +104,16 @@ load_biad_data <- function(refresh = FALSE, quiet = FALSE) {
     cache_age = 0
   )
 
-  dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
   tryCatch(
-    saveRDS(bundle, path),
-    error = function(e) warning("Could not write the data cache: ", conditionMessage(e))
+    {
+      dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
+      saveRDS(bundle, path)
+    },
+    error = function(e) {
+      if (!quiet) {
+        message("BIAD data cache was not written: ", conditionMessage(e))
+      }
+    }
   )
 
   bundle

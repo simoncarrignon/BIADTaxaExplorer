@@ -39,6 +39,16 @@ load_polygon_file <- function(path, reference_data, layer = NULL) {
     return(NULL)
   }
 
+  # GeoPackages can contain more than one layer. Prefer the layer named after
+  # the file, otherwise read the first layer, so callers do not need to know.
+  if (is.null(layer)) {
+    layers <- tryCatch(sf::st_layers(path)$name, error = function(e) character(0))
+    if (length(layers) > 1) {
+      preferred <- tools::file_path_sans_ext(basename(path))
+      layer <- if (preferred %in% layers) preferred else layers[[1]]
+    }
+  }
+
   polygons <- sf::st_read(path, layer = layer, quiet = TRUE)
   normalize_polygon_data(polygons, reference_data)
 }

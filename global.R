@@ -14,7 +14,10 @@ suppressPackageStartupMessages({
 
 options(
   shiny.maxRequestSize = 64 * 1024^2,
-  shiny.sanitize.errors = FALSE
+  shiny.sanitize.errors = FALSE,
+  # Shiny Server app directories are often read-only. Do not try to write
+  # compiled Sass into app_cache/sass.
+  sass.cache = FALSE
 )
 
 # BIADconnect lives next to this project in the COREX workspace. Prefer the
@@ -33,7 +36,6 @@ if (dir.exists("../BIADconnect")) {
 # Constants -------------------------------------------------------------------
 PHASE_SEPARATOR <- "||"
 DEFAULT_POLYGON_PATH <- "groupings/spatial/polygon_18112026_SC_v2.gpkg"
-DEFAULT_POLYGON_LAYER <- "polygon_18112026_SC_v2"
 
 app_files <- c(
   "R/cache.R",

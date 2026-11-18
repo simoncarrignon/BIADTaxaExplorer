@@ -32,7 +32,8 @@ if (dir.exists("../BIADconnect")) {
 
 # Constants -------------------------------------------------------------------
 PHASE_SEPARATOR <- "||"
-DEFAULT_POLYGON_PATH <- "groupings/spatial/ss_three_polygons_230126.gpkg"
+DEFAULT_POLYGON_PATH <- "groupings/spatial/polygon_18112026_SC_v2.gpkg"
+DEFAULT_POLYGON_LAYER <- "polygon_18112026_SC_v2"
 
 app_files <- c(
   "R/cache.R",

@@ -34,12 +34,12 @@ normalize_polygon_data <- function(polygons, reference_data) {
   normalized
 }
 
-load_polygon_file <- function(path, reference_data) {
+load_polygon_file <- function(path, reference_data, layer = NULL) {
   if (is.null(path) || !nzchar(path) || !file.exists(path)) {
     return(NULL)
   }
 
-  polygons <- sf::st_read(path, quiet = TRUE)
+  polygons <- sf::st_read(path, layer = layer, quiet = TRUE)
   normalize_polygon_data(polygons, reference_data)
 }
 

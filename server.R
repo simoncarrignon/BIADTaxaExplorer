@@ -778,7 +778,7 @@ server <- function(input, output, session) {
 
     default_polygons_attempted(TRUE)
     default_polygons <- tryCatch(
-      load_polygon_file(DEFAULT_POLYGON_PATH, points),
+      load_polygon_file(DEFAULT_POLYGON_PATH, points, layer = DEFAULT_POLYGON_LAYER),
       error = function(error) {
         warning(sprintf(
           "Failed to load default polygons from '%s': %s",

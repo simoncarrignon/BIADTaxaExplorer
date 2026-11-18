@@ -615,10 +615,13 @@ app_ui <- function() {
                 ),
                 shinycssloaders::withSpinner(plotOutput("plot3", height = "680px"), type = 8, color = "#2f5d5a", size = 0.7),
                 tags$p(class = "plot-caption", "Arrows follow phase order inside each polygon."),
-                shinycssloaders::withSpinner(plotOutput("plot4_diag", height = "300px"), type = 8, color = "#2f5d5a", size = 0.6),
-                tags$p(class = "plot-caption", "Variance explained (PCA) or inertia explained (CA) per dimension."),
                 shinycssloaders::withSpinner(plotOutput("plot4", height = "520px"), type = 8, color = "#2f5d5a", size = 0.7),
                 tags$p(class = "plot-caption", "How the first two ordination dimensions evolve through time for each polygon.")
+              ),
+              bslib::nav_panel(
+                "Diagnostics",
+                shinycssloaders::withSpinner(plotOutput("plot4_diag", height = "300px"), type = 8, color = "#2f5d5a", size = 0.6),
+                tags$p(class = "plot-caption", "Variance explained (PCA) or inertia explained (CA) per dimension.")
               ),
               bslib::nav_panel(
                 "Data preview",

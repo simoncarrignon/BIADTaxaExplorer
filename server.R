@@ -724,21 +724,21 @@ server <- function(input, output, session) {
       if (has_polygons) {
         downloadButton(
           "download_polygons",
-          tagList(app_icon("download"), "Polygons"),
+          "Polygons",
           class = "btn-sm btn-soft"
         )
       },
       if (has_results) {
         downloadButton(
           "download_raw_table",
-          tagList(app_icon("download"), "Raw phases"),
+          "Raw phases",
           class = "btn-sm btn-soft"
         )
       },
       if (has_results) {
         downloadButton(
           "download_table",
-          tagList(app_icon("download"), "Aggregated"),
+          "Aggregated",
           class = "btn-sm btn-soft"
         )
       }

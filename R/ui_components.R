@@ -365,6 +365,29 @@ app_ui <- function() {
                   "Taxa used by several subgroups are counted in each and flagged after the analysis."
                 )
               ),
+              uiOutput("taxon_table"),
+              tags$details(
+                class = "manage-details",
+                tags$summary("Manage grouping files"),
+                div(
+                  class = "manage-body",
+                  fileInput(
+                    "upload_group",
+                    NULL,
+                    accept = ".csv",
+                    buttonLabel = tagList(app_icon("upload"), "Upload CSV"),
+                    placeholder = "No file selected",
+                    width = "100%"
+                  ),
+                  div(
+                    class = "manage-actions",
+                    downloadButton("download_group", "Download", class = "btn-sm btn-soft"),
+                    actionButton("edit_group", tagList(app_icon("pen"), "Edit labels"), class = "btn-sm btn-soft"),
+                    downloadButton("download_template", tagList(app_icon("file-lines"), "Template"), icon = NULL, class = "btn-sm btn-soft")
+                  ),
+                  helper_text("Format: group number, group label, taxa codes separated by +.")
+                )
+              ),
               div(class = "sidebar-divider"),
               subsection_label(
                 "Study area",
@@ -410,29 +433,6 @@ app_ui <- function() {
                     "Longitude and latitude columns are detected from their names; ",
                     "adjust the chooser if needed."
                   )
-                )
-              ),
-              uiOutput("taxon_table"),
-              tags$details(
-                class = "manage-details",
-                tags$summary("Manage grouping files"),
-                div(
-                  class = "manage-body",
-                  fileInput(
-                    "upload_group",
-                    NULL,
-                    accept = ".csv",
-                    buttonLabel = tagList(app_icon("upload"), "Upload CSV"),
-                    placeholder = "No file selected",
-                    width = "100%"
-                  ),
-                  div(
-                    class = "manage-actions",
-                    downloadButton("download_group", tagList(app_icon("download"), "Download"), class = "btn-sm btn-soft"),
-                    actionButton("edit_group", tagList(app_icon("pen"), "Edit labels"), class = "btn-sm btn-soft"),
-                    downloadButton("download_template", tagList(app_icon("file-lines"), "Template"), class = "btn-sm btn-soft")
-                  ),
-                  helper_text("Format: group number, group label, taxa codes separated by +.")
                 )
               )
             ),
